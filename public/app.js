@@ -136,6 +136,8 @@ function route() {
     else more.removeAttribute('aria-current');
   }
   closeSheet();
+  // Charts are sized to their box, which has no width while the tab is hidden.
+  if (tab === 'ky-luc') renderRaceCharts();
   const label = $(`.nav a[data-tab="${tab}"] span`)?.textContent;
   document.title = tab === 'tong-quan' || !label ? 'Xu hướng AI' : `${label} · Xu hướng AI`;
 }
@@ -353,6 +355,7 @@ function renderProgress(progress) {
   );
   renderOverviewBench();
   renderPulse();
+  renderRace();
 }
 
 // Crosshair-style hover: snap to the nearest record point.
@@ -385,6 +388,396 @@ function initSparkHover() {
     tip.style.top = `${ty - tip.offsetHeight - 12}px`;
   });
   host.addEventListener('mouseleave', clear);
+}
+
+// ---------- model race ----------
+
+// Fixed colour order (validated for colour-blind readers); a lab keeps its colour in every chart.
+const LABS = [
+  { id: 'anthropic', name: 'Anthropic' },
+  { id: 'open', name: 'Mã nguồn mở' },
+  { id: 'openai', name: 'OpenAI' },
+  { id: 'google', name: 'Google' },
+];
+const race = { bench: 'web', sort: null, dir: -1, open: false, cheap: false, all: false };
+const LB_FIRST = 20;
+const nfPrice = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
+let valuePts = [];
+let raceView = null;
+
+const shortScore = (kind, v) => (kind === 'elo' ? nf0.format(Math.round(v)) : `${nf1.format(v * 100)}%`);
+const fmtPrice = (v) => `${nfPrice.format(v < 0.1 ? +v.toFixed(3) : v)} $`;
+const fmtCtx = (c) => (c >= 1e6 ? `${nf1.format(c / 1e6)}M` : `${Math.round(c / 1000)}K`);
+// "DeepSeek V4.1 Flash 1017" → "DeepSeek V4.1 Flash" for chart labels.
+const shortName = (name) => name.replace(/\s*\(\d{4}\)$/, '').replace(/\s+\d{4}$/, '');
+const legendItem = (cls, name, line = false) => `<span class="lg"><i class="sw${line ? ' line' : ''} ${cls}"></i>${esc(name)}</span>`;
+
+function showTip(html, x, y) {
+  const tip = $('#tip');
+  tip.innerHTML = html;
+  tip.hidden = false;
+  tip.style.left = `${Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, x - tip.offsetWidth / 2))}px`;
+  tip.style.top = `${Math.max(8, y - tip.offsetHeight - 14)}px`;
+}
+const hideTip = () => { $('#tip').hidden = true; };
+
+// Round tick values covering [lo, hi].
+function ticks(lo, hi, count) {
+  const raw = (hi - lo) / count;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  const out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+  return out;
+}
+
+function renderValueChart() {
+  const host = $('#value-chart');
+  const R = data.progress.race;
+  const b = R.benches[race.bench];
+  if (!host.clientWidth) return;
+  const pts = R.models.filter((m) => m.blend && m.scores[b.key]).map((m) => ({ m, v: m.scores[b.key].v, p: m.blend }));
+  if (pts.length < 3) {
+    host.innerHTML = '<p class="empty">Chưa đủ model có cả điểm và giá cho bài này.</p>';
+    setHTML('#value-insight', '');
+    return;
+  }
+  // Cheapest model at each level of score: the ones worth considering.
+  const front = [];
+  for (const q of [...pts].sort((a, c) => a.p - c.p || c.v - a.v)) if (!front.length || q.v > front.at(-1).v) front.push(q);
+  const top = front.at(-1);
+  const near = front.find((q) => (b.kind === 'elo' ? q.v >= top.v - 100 : q.v >= top.v * 0.8));
+  // The cheapest one still worth a look: at least half the top score, or within 300 Elo.
+  const cheapest = front.find((q) => (b.kind === 'elo' ? q.v >= top.v - 300 : q.v >= top.v * 0.5));
+  const times = (a, c) => `${nf0.format(Math.round(a / c))} lần`;
+  const gapText = (q) => (b.kind === 'elo' ? `kém ${nf0.format(Math.round(top.v - q.v))} điểm` : `đạt ${shortScore(b.kind, q.v)} so với ${shortScore(b.kind, top.v)}`);
+  const lines = [];
+  if (near && near !== top) lines.push(`<b>${esc(shortName(near.m.name))}</b> ${gapText(near)} của model giỏi nhất (${esc(shortName(top.m.name))}) mà rẻ hơn ${times(top.p, near.p)}.`);
+  if (cheapest && cheapest !== near && cheapest !== top) lines.push(`Rẻ hơn nữa: <b>${esc(shortName(cheapest.m.name))}</b>, ${fmtPrice(cheapest.p)} cho ${shortScore(b.kind, cheapest.v)}${b.kind === 'elo' ? ' điểm' : ''}.`);
+  setHTML('#value-insight', lines.join(' '));
+
+  const W = host.clientWidth;
+  const H = Math.round(Math.max(280, Math.min(420, W * 0.48)));
+  const P = { l: 46, r: 14, t: 12, b: 38 };
+  const lx = (p) => Math.log10(p);
+  const xs = pts.map((q) => lx(q.p));
+  const x0 = Math.min(...xs) - 0.12;
+  const x1 = Math.max(...xs) + 0.12;
+  const vs = pts.map((q) => q.v);
+  const span = Math.max(...vs) - Math.min(...vs) || 1;
+  const y0 = Math.min(...vs) - span * 0.08;
+  const y1 = Math.max(...vs) + span * 0.1;
+  const X = (p) => P.l + ((lx(p) - x0) / (x1 - x0)) * (W - P.l - P.r);
+  const Y = (v) => P.t + (1 - (v - y0) / (y1 - y0)) * (H - P.t - P.b);
+
+  let xt = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100].filter((t) => lx(t) >= x0 && lx(t) <= x1);
+  if (W < 520) xt = xt.filter((t) => /^(0\.0?)?1|^10?0?$/.test(String(t)));
+  const yt = ticks(y0, y1, H < 320 ? 4 : 5);
+
+  const grid = yt.map((t) => `<line class="grid" x1="${P.l}" x2="${W - P.r}" y1="${Y(t)}" y2="${Y(t)}"/><text class="tick" x="${P.l - 8}" y="${Y(t) + 4}" text-anchor="end">${shortScore(b.kind, t)}</text>`).join('');
+  const xticks = xt.map((t) => `<line class="grid faint" x1="${X(t)}" x2="${X(t)}" y1="${P.t}" y2="${H - P.b}"/><text class="tick" x="${X(t)}" y="${H - P.b + 16}" text-anchor="middle">${fmtPrice(t)}</text>`).join('');
+  const frontPath = `M${front.map((q) => `${X(q.p).toFixed(1)},${Y(q.v).toFixed(1)}`).join('L')}`;
+
+  // Draw closed first so open models (fewer, cheaper) stay visible on top.
+  valuePts = [...pts].sort((a, c) => a.m.open - c.m.open);
+  const dots = valuePts.map((q, i) => `<circle class="dot ${q.m.open ? 's-open' : 's-closed'}" data-k="${i}" cx="${X(q.p).toFixed(1)}" cy="${Y(q.v).toFixed(1)}" r="5"/>`).join('');
+  const hits = valuePts.map((q, i) => `<circle class="hit" data-k="${i}" cx="${X(q.p).toFixed(1)}" cy="${Y(q.v).toFixed(1)}" r="12"/>`).join('');
+
+  // Name only the models on the cheapest-for-score line, skipping labels that would collide.
+  const placed = [];
+  const labels = [];
+  for (const q of [...front].reverse()) {
+    const text = shortName(q.m.name);
+    const w = text.length * 6.4;
+    const cx = X(q.p);
+    const cy = Y(q.v);
+    const right = cx + 9 + w <= W - P.r;
+    const options = [
+      { x: right ? cx + 9 : cx - 9, y: cy + 4, anchor: right ? 'start' : 'end' },
+      { x: cx, y: cy - 11, anchor: 'middle' },
+      { x: cx, y: cy + 19, anchor: 'middle' },
+    ];
+    for (const o of options) {
+      const left = o.anchor === 'start' ? o.x : o.anchor === 'end' ? o.x - w : o.x - w / 2;
+      const box = { l: left - 2, r: left + w + 2, t: o.y - 11, b: o.y + 3 };
+      if (box.l < 0 || box.r > W || box.t < 0 || box.b > H - P.b) continue;
+      if (placed.some((p) => box.l < p.r && box.r > p.l && box.t < p.b && box.b > p.t)) continue;
+      placed.push(box);
+      labels.push(`<text class="lbl" x="${o.x.toFixed(1)}" y="${o.y.toFixed(1)}" text-anchor="${o.anchor}">${esc(text)}</text>`);
+      break;
+    }
+  }
+
+  host.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Biểu đồ giá so với điểm ${esc(b.title)}: ${pts.length} model">
+    ${grid}${xticks}
+    <line class="axis-line" x1="${P.l}" x2="${W - P.r}" y1="${H - P.b}" y2="${H - P.b}"/>
+    <text class="axis-title" x="${W - P.r}" y="${H - 4}" text-anchor="end">Giá, USD / 1 triệu token (thang log) →</text>
+    <path class="front" d="${frontPath}"/>${dots}${labels.join('')}${hits}
+  </svg>`;
+}
+
+function valueTip(q, b) {
+  const m = q.m;
+  const s = m.scores[b.key];
+  return `<b>${esc(m.name)}</b><br>${esc(m.org)} · ${m.open ? 'mã nguồn mở' : 'mã nguồn đóng'}<br>
+    ${esc(b.title)}: <b>${fmtScore(b.kind, s.v)}</b>${s.effort && EFFORT[s.effort] ? ` (${EFFORT[s.effort]})` : ''}<br>
+    Giá: ${fmtPrice(m.priceIn)} vào · ${fmtPrice(m.priceOut)} ra`;
+}
+
+function renderRaceChart() {
+  const host = $('#race-chart');
+  const b = data.progress.race.benches[race.bench];
+  if (!host.clientWidth) return;
+  const now = Date.now();
+  const series = LABS.map((l) => ({ ...l, steps: (b.series[l.id] ?? []).map((s) => ({ ...s, t: Date.parse(s.date) })) })).filter((s) => s.steps.length);
+  if (!series.length) {
+    host.innerHTML = '<p class="empty">Chưa có dữ liệu.</p>';
+    return;
+  }
+  const t0 = Math.max(Math.min(...series.map((s) => s.steps[0].t)), now - 540 * DAY);
+  // The record each lab held at a moment in time.
+  const at = (s, t) => [...s.steps].reverse().find((x) => x.t <= t) ?? null;
+  const shown = series.map((s) => ({ ...s, start: at(s, t0), inside: s.steps.filter((x) => x.t > t0) }));
+  const vals = shown.flatMap((s) => [s.start?.v, ...s.inside.map((x) => x.v)]).filter((v) => v != null);
+  const span = Math.max(...vals) - Math.min(...vals) || 1;
+  const y0 = Math.min(...vals) - span * 0.06;
+  const y1 = Math.max(...vals) + span * 0.08;
+
+  const W = host.clientWidth;
+  const H = Math.round(Math.max(240, Math.min(340, W * 0.55)));
+  const P = { l: 46, r: 92, t: 12, b: 28 };
+  const X = (t) => P.l + ((t - t0) / (now - t0)) * (W - P.l - P.r);
+  const Y = (v) => P.t + (1 - (v - y0) / (y1 - y0)) * (H - P.t - P.b);
+
+  const yt = ticks(y0, y1, 4);
+  const grid = yt.map((t) => `<line class="grid" x1="${P.l}" x2="${W - P.r}" y1="${Y(t)}" y2="${Y(t)}"/><text class="tick" x="${P.l - 8}" y="${Y(t) + 4}" text-anchor="end">${shortScore(b.kind, t)}</text>`).join('');
+  const months = [];
+  const d = new Date(t0);
+  d.setDate(1);
+  d.setMonth(d.getMonth() + 1);
+  const every = W < 520 ? 6 : 3;
+  while (d.getTime() < now) {
+    if (d.getMonth() % every === 0) months.push(d.getTime());
+    d.setMonth(d.getMonth() + 1);
+  }
+  const xt = months.map((t) => {
+    const m = new Date(t);
+    return `<text class="tick" x="${X(t)}" y="${H - P.b + 16}" text-anchor="middle">${m.getMonth() === 0 ? m.getFullYear() : `T${m.getMonth() + 1}`}</text>`;
+  }).join('');
+
+  const ends = [];
+  const lines = shown.map((s) => {
+    const first = s.start ?? s.inside[0];
+    let path = `M${X(Math.max(first.t, t0)).toFixed(1)},${Y(first.v).toFixed(1)}`;
+    for (const x of s.inside.filter((x) => x !== first)) path += `H${X(x.t).toFixed(1)}V${Y(x.v).toFixed(1)}`;
+    path += `H${X(now).toFixed(1)}`;
+    const last = s.inside.at(-1) ?? s.start;
+    ends.push({ s, y: Y(last.v) });
+    const pts = s.inside.map((x) => `<circle class="pt s-${s.id}" cx="${X(x.t).toFixed(1)}" cy="${Y(x.v).toFixed(1)}" r="4"/>`).join('');
+    return `<path class="series s-${s.id}" d="${path}"/>${pts}`;
+  }).join('');
+  // Line-end names, nudged apart so they never overlap.
+  ends.sort((a, c) => a.y - c.y);
+  for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 14);
+  const over = ends.length ? ends.at(-1).y - (H - P.b) : 0;
+  if (over > 0) for (const e of ends) e.y -= over;
+  const endLabels = ends.map((e) => `<text class="end-lbl" x="${X(now) + 8}" y="${(e.y + 4).toFixed(1)}">${esc(e.s.name)}</text>`).join('');
+
+  raceView = { shown, b, X, t0, now, W, H, P };
+  host.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Điểm cao nhất theo hãng, ${esc(b.title)}">
+    ${grid}${xt}
+    <line class="axis-line" x1="${P.l}" x2="${W - P.r}" y1="${H - P.b}" y2="${H - P.b}"/>
+    ${lines}${endLabels}
+    <line class="cross" x1="0" x2="0" y1="${P.t}" y2="${H - P.b}" hidden/>
+    <rect class="hit" x="${P.l}" y="0" width="${W - P.l - P.r}" height="${H - P.b}"/>
+  </svg>`;
+}
+
+function raceTip(e) {
+  const v = raceView;
+  const svg = $('#race-chart svg');
+  if (!v || !svg) return;
+  const rect = svg.getBoundingClientRect();
+  const px = Math.min(Math.max(e.clientX - rect.left, v.P.l), v.W - v.P.r);
+  const t = v.t0 + ((px - v.P.l) / (v.W - v.P.l - v.P.r)) * (v.now - v.t0);
+  const cross = svg.querySelector('.cross');
+  cross.setAttribute('x1', px);
+  cross.setAttribute('x2', px);
+  cross.removeAttribute('hidden');
+  const rows = v.shown
+    .map((s) => ({ s, x: [...s.steps].reverse().find((x) => x.t <= t) }))
+    .filter((r) => r.x)
+    .sort((a, c) => c.x.v - a.x.v)
+    .map((r) => `<span class="tip-row"><i class="sw s-${r.s.id}"></i>${esc(r.s.name)}: <b>${shortScore(v.b.kind, r.x.v)}</b> · ${esc(shortName(r.x.model))}</span>`)
+    .join('');
+  showTip(`${new Date(t).toLocaleDateString('vi-VN', { month: 'numeric', year: 'numeric' })}<br>${rows || 'Chưa có model nào được chấm'}`, rect.left + px, e.clientY);
+}
+
+function renderGap() {
+  const b = data.progress.race.benches[race.bench];
+  const g = b.gap;
+  if (!g.open || !g.closed) {
+    setHTML('#gap', '<p class="empty">Chưa đủ dữ liệu để so sánh.</p>');
+    return;
+  }
+  const diff = g.closed.v - g.open.v;
+  const diffText = b.kind === 'elo' ? `${nf0.format(Math.round(diff))} điểm` : `${nf1.format(diff * 100)} điểm %`;
+  let lag = '';
+  if (g.lagDays === 0) lag = `Lúc ra mắt (${fmtDate(g.open.date)}), ${esc(g.open.name)} ngang model đóng tốt nhất khi đó; model đóng vượt lên sau.`;
+  else if (g.lagDays != null && g.caughtUpBy) {
+    const months = Math.round(g.lagDays / 30);
+    lag = `Lúc ra mắt, ${esc(g.open.name)} chỉ bằng <b>${esc(g.caughtUpBy.name)}</b> ra từ ${fmtDate(g.caughtUpBy.date)}: mã nguồn mở đi sau khoảng <b>${months ? `${months} tháng` : 'vài tuần'}</b>.`;
+  }
+  const stale = b.latest && Date.now() - Date.parse(b.latest) > 120 * DAY
+    ? `<p class="stale">${icon('clock')}Bài này chưa chấm model nào mới từ ${fmtDate(b.latest)}, nên số liệu có thể đã cũ.</p>`
+    : '';
+  const row = (label, x, cls) => `<div class="gap-row"><span class="gap-label"><i class="sw ${cls}"></i>${label}</span><span class="gap-model">${esc(x.name)}<small>${esc(x.org)} · ${fmtDate(x.date)}</small></span><b>${shortScore(b.kind, x.v)}</b></div>`;
+  setHTML(
+    '#gap',
+    `<div class="gap-hero">${diff > 0 ? diffText : 'Ngang nhau'}</div>
+    <div class="gap-sub">${diff > 0 ? 'mã nguồn mở tốt nhất kém mã nguồn đóng tốt nhất' : 'mã nguồn mở đã bắt kịp'}</div>
+    <div class="gap-rows">${row('Đóng tốt nhất', g.closed, 's-closed')}${row('Mở tốt nhất', g.open, 's-open')}</div>
+    ${lag ? `<p class="gap-lag">${lag}</p>` : ''}
+    ${stale}
+    <button class="btn" type="button" id="gap-open">Xem các model mã nguồn mở ${icon('arrow')}</button>`,
+  );
+}
+
+const LB_COLS = [
+  { key: 'web', label: 'Làm web' },
+  { key: 'code', label: 'Lập trình' },
+  { key: 'terminal', label: 'Terminal' },
+  { key: 'price', label: 'Giá vào / ra', dir: 1 },
+  { key: 'context', label: 'Ngữ cảnh' },
+  { key: 'date', label: 'Ra mắt' },
+];
+
+function lbValue(m, key) {
+  if (key === 'price') return m.blend;
+  if (key === 'context') return m.context ?? null;
+  if (key === 'date') return Date.parse(m.date);
+  return m.scores[key]?.v ?? null;
+}
+
+function renderLeaderboard() {
+  const R = data.progress.race;
+  const key = race.sort ?? race.bench;
+  const rows = R.models
+    .filter((m) => (!race.open || m.open) && (!race.cheap || (m.blend != null && m.blend < 1)))
+    .map((m) => ({ m, v: lbValue(m, key) }))
+    // Models without a value for the sorted column always sink to the bottom.
+    .sort((a, c) => (a.v == null) - (c.v == null) || (a.v - c.v) * race.dir);
+  const list = race.all ? rows : rows.slice(0, LB_FIRST);
+  const head = LB_COLS.map((c) => {
+    const sort = c.key === key ? (race.dir < 0 ? 'descending' : 'ascending') : 'none';
+    const arrow = sort === 'none' ? '' : sort === 'descending' ? ' ↓' : ' ↑';
+    return `<th class="num" aria-sort="${sort}"><button type="button" data-sort="${c.key}">${c.label}${arrow}</button></th>`;
+  }).join('');
+  const body = list
+    .map(({ m }, i) => {
+      const score = (k) => {
+        const s = m.scores[k];
+        return `<td class="num${k === key ? ' on' : ''}">${s ? shortScore(R.benches[k].kind, s.v) : '<span class="none">–</span>'}</td>`;
+      };
+      const name = m.url ? link(m.url, esc(m.name)) : esc(m.name);
+      return `<tr>
+        <td class="rank">${i + 1}</td>
+        <td class="model">${name}<small>${esc(m.org)}${m.open ? ' · <span class="open-tag"><i class="sw s-open"></i>mở</span>' : ''}</small></td>
+        ${score('web')}${score('code')}${score('terminal')}
+        <td class="num${key === 'price' ? ' on' : ''}">${m.blend != null ? `${nfPrice.format(m.priceIn)} / ${nfPrice.format(m.priceOut)} $` : '<span class="none">chưa có giá</span>'}</td>
+        <td class="num${key === 'context' ? ' on' : ''}">${m.context ? fmtCtx(m.context) : '<span class="none">–</span>'}</td>
+        <td class="num${key === 'date' ? ' on' : ''}">${fmtDate(m.date)}</td>
+      </tr>`;
+    })
+    .join('');
+  setHTML(
+    '#leaderboard',
+    rows.length
+      ? `<table class="lb"><thead><tr><th class="rank">#</th><th class="model">Model</th>${head}</tr></thead><tbody>${body}</tbody></table>
+        ${rows.length > LB_FIRST ? `<button class="linkbtn lb-more" type="button" id="lb-all">${race.all ? 'Thu gọn' : `Xem tất cả ${rows.length} model`}</button>` : ''}`
+      : '<p class="empty">Không có model nào khớp bộ lọc.</p>',
+  );
+}
+
+function renderRaceCharts() {
+  if (!data.progress?.race) return;
+  renderValueChart();
+  renderRaceChart();
+}
+
+function renderRace() {
+  const R = data.progress?.race;
+  if (!R) {
+    for (const sel of ['#value-chart', '#race-chart', '#gap', '#leaderboard']) setHTML(sel, '<p class="empty">Chưa có dữ liệu cuộc đua, thử bấm “Làm mới”.</p>');
+    return;
+  }
+  for (const btn of $$('#race-bench [data-bench]')) btn.setAttribute('aria-pressed', btn.dataset.bench === race.bench);
+  const b = R.benches[race.bench];
+  const about = data.progress.benchmarks.find((x) => x.name === b.name);
+  setHTML('#race-about', `<b>${esc(b.title)}</b> (${esc(b.name)}): ${esc(about?.desc ?? '')} ${b.tested} model đã được chấm, mới nhất ngày ${fmtDate(b.latest)}.`);
+  setHTML('#value-legend', legendItem('s-closed', 'Mã nguồn đóng') + legendItem('s-open', 'Mã nguồn mở'));
+  setHTML('#race-legend', LABS.filter((l) => b.series[l.id]?.length).map((l) => legendItem(`s-${l.id}`, l.name, true)).join(''));
+  renderRaceCharts();
+  renderGap();
+  renderLeaderboard();
+}
+
+function initRace() {
+  $('#race-bench').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-bench]');
+    if (!btn || !data.progress?.race) return;
+    Object.assign(race, { bench: btn.dataset.bench, sort: null, dir: -1 });
+    renderRace();
+  });
+  const chart = $('#value-chart');
+  const valueHover = (e) => {
+    const hit = e.target.closest('.hit');
+    for (const d of chart.querySelectorAll('.dot.on')) d.classList.remove('on');
+    if (!hit) return hideTip();
+    const q = valuePts[hit.dataset.k];
+    chart.querySelector(`.dot[data-k="${hit.dataset.k}"]`)?.classList.add('on');
+    const r = hit.getBoundingClientRect();
+    showTip(valueTip(q, data.progress.race.benches[race.bench]), r.left + r.width / 2, r.top + 6);
+  };
+  chart.addEventListener('pointermove', valueHover);
+  chart.addEventListener('click', valueHover);
+  chart.addEventListener('pointerleave', () => { hideTip(); for (const d of chart.querySelectorAll('.dot.on')) d.classList.remove('on'); });
+  const rc = $('#race-chart');
+  rc.addEventListener('pointermove', (e) => (e.target.closest('.hit') ? raceTip(e) : hideTip()));
+  rc.addEventListener('pointerleave', () => { hideTip(); rc.querySelector('.cross')?.setAttribute('hidden', ''); });
+
+  $('#leaderboard').addEventListener('click', (e) => {
+    if (!data.progress?.race) return;
+    const th = e.target.closest('[data-sort]');
+    if (th) {
+      const col = LB_COLS.find((c) => c.key === th.dataset.sort);
+      const current = race.sort ?? race.bench;
+      race.dir = current === col.key ? -race.dir : col.dir ?? -1;
+      race.sort = col.key;
+      renderLeaderboard();
+    } else if (e.target.id === 'lb-all') {
+      race.all = !race.all;
+      renderLeaderboard();
+    }
+  });
+  for (const [id, field] of [['#lb-open', 'open'], ['#lb-cheap', 'cheap']]) {
+    $(id).addEventListener('change', (e) => {
+      race[field] = e.target.checked;
+      if (data.progress?.race) renderLeaderboard();
+    });
+  }
+  $('#gap').addEventListener('click', (e) => {
+    if (!e.target.closest('#gap-open')) return;
+    race.open = true;
+    $('#lb-open').checked = true;
+    renderLeaderboard();
+    $('.race-table').scrollIntoView({ block: 'start' });
+  });
+  let frame = 0;
+  addEventListener('resize', () => {
+    cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(renderRaceCharts);
+  });
 }
 
 // ---------- news ----------
@@ -1430,7 +1823,7 @@ async function loadAll(force = false) {
     load('models', renderModels, ['#models', '#ov-models']),
     load('tools', renderTools, ['#hf-models', '#hf-spaces']),
     load('papers', renderPapers, ['#papers']),
-    load('progress', renderProgress, ['#bench', '#ov-bench']),
+    load('progress', renderProgress, ['#bench', '#ov-bench', '#value-chart', '#race-chart', '#gap', '#leaderboard']),
     load('ideas', renderIdeas, ['#sparks', '#problem-picker', '#nodes', '#ov-sparks']),
   ]);
   btn?.classList.remove('spin');
@@ -1543,6 +1936,7 @@ try {
   measureSticky();
   renderLanguage();
   initSparkHover();
+  initRace();
   initIdeas();
   initPalette();
   syncThemeIcon();

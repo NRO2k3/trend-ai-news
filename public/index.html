@@ -64,7 +64,7 @@
         <a href="#cong-nghe" data-tab="cong-nghe"><svg class="i"><use href="#i-layers"/></svg><span>Công nghệ &amp; công cụ</span></a>
         <a href="#y-tuong" data-tab="y-tuong"><svg class="i"><use href="#i-bulb"/></svg><span>Ý tưởng</span><em class="count" data-count="book"></em></a>
         <a href="#nghien-cuu" data-tab="nghien-cuu"><svg class="i"><use href="#i-book"/></svg><span>Nghiên cứu</span></a>
-        <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg><span>AI giỏi tới đâu</span></a>
+        <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg><span>Cuộc đua model</span></a>
       </nav>
       <div class="sidebar-foot">
         <div class="status"><span class="live"></span><span id="updated">Đang tải…</span></div>
@@ -124,7 +124,7 @@
           </div>
         </div>
         <section class="panel">
-          <div class="panel-head"><h2><svg class="i"><use href="#i-trophy"/></svg>AI code giỏi tới đâu rồi</h2><a class="more" href="#ky-luc">Chi tiết<svg class="i"><use href="#i-arrow"/></svg></a></div>
+          <div class="panel-head"><h2><svg class="i"><use href="#i-trophy"/></svg>AI code giỏi tới đâu rồi</h2><a class="more" href="#ky-luc">Cuộc đua model<svg class="i"><use href="#i-arrow"/></svg></a></div>
           <div id="ov-bench" class="ov-bench"><div class="skeleton"></div></div>
         </section>
       </section>
@@ -295,10 +295,49 @@
       <section class="page" data-page="ky-luc" hidden>
         <header class="page-head">
           <div>
-            <h1>AI giỏi tới đâu</h1>
-            <p class="lede">Kỷ lục của AI trên các bài kiểm tra làm web và lập trình. Rê chuột lên biểu đồ để xem từng mốc. Nguồn: <a href="https://epoch.ai/benchmarks" target="_blank" rel="noopener">Epoch AI</a></p>
+            <h1>Cuộc đua model</h1>
+            <p class="lede">Model nào làm web, viết code giỏi nhất, rẻ nhất, và hãng nào đang dẫn. Điểm từ <a href="https://epoch.ai/benchmarks" target="_blank" rel="noopener">Epoch AI</a>, giá từ <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a>.</p>
+          </div>
+          <div class="seg" id="race-bench" role="group" aria-label="Bài kiểm tra">
+            <button type="button" data-bench="web" aria-pressed="true">Làm web</button>
+            <button type="button" data-bench="code" aria-pressed="false">Lập trình</button>
+            <button type="button" data-bench="terminal" aria-pressed="false">Terminal</button>
           </div>
         </header>
+        <p class="hint pane-hint" id="race-about"></p>
+
+        <section class="panel race-value">
+          <div class="panel-head"><h2><svg class="i"><use href="#i-spark"/></svg>Giá so với điểm</h2><div class="legend" id="value-legend"></div></div>
+          <p class="insight" id="value-insight"></p>
+          <div class="chart" id="value-chart"><div class="skeleton tall"></div></div>
+          <p class="hint chart-note">Giá trộn 3 phần đầu vào : 1 phần đầu ra (agent code đọc nhiều hơn viết), USD cho 1 triệu token, theo giá niêm yết. Để model suy nghĩ nhiều thì tốn thêm token nên chi phí thật cao hơn. Đường nét đứt nối các model rẻ nhất ở mỗi mức điểm.</p>
+        </section>
+
+        <div class="race-grid">
+          <section class="panel">
+            <div class="panel-head"><h2><svg class="i"><use href="#i-trend"/></svg>Cuộc đua theo hãng</h2><div class="legend" id="race-legend"></div></div>
+            <p class="hint">Điểm cao nhất của mỗi hãng theo thời gian; đường chỉ đi lên khi hãng tự phá kỷ lục của mình.</p>
+            <div class="chart" id="race-chart"><div class="skeleton tall"></div></div>
+          </section>
+          <section class="panel gap-panel">
+            <div class="panel-head"><h2><svg class="i"><use href="#i-repo"/></svg>Mã nguồn mở đi sau bao xa</h2></div>
+            <div id="gap"><div class="skeleton tall"></div></div>
+          </section>
+        </div>
+
+        <section class="panel race-table">
+          <div class="panel-head">
+            <h2><svg class="i"><use href="#i-trophy"/></svg>Bảng xếp hạng</h2>
+            <div class="filters">
+              <label class="check-pill"><input type="checkbox" id="lb-open">Chỉ mã nguồn mở</label>
+              <label class="check-pill"><input type="checkbox" id="lb-cheap">Giá dưới 1 $</label>
+            </div>
+          </div>
+          <p class="hint">Model ra mắt trong 12 tháng qua. Bấm tiêu đề cột để sắp xếp; ô trống là model chưa được chấm ở bài đó.</p>
+          <div class="table-wrap" id="leaderboard"><div class="skeleton"></div></div>
+        </section>
+
+        <h2 class="section-title"><svg class="i"><use href="#i-clock"/></svg>Kỷ lục từng bài kiểm tra<span class="hint inline">Rê chuột lên biểu đồ để xem từng mốc.</span></h2>
         <div class="bench-grid" id="bench"><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div></div>
       </section>
 
@@ -321,7 +360,7 @@
     <div class="sheet-card" role="dialog" aria-label="Thêm">
       <a href="#cong-nghe" data-tab="cong-nghe"><svg class="i"><use href="#i-layers"/></svg>Công nghệ &amp; công cụ</a>
       <a href="#nghien-cuu" data-tab="nghien-cuu"><svg class="i"><use href="#i-book"/></svg>Nghiên cứu</a>
-      <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg>AI giỏi tới đâu</a>
+      <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg>Cuộc đua model</a>
       <button type="button" id="lang-mobile"><svg class="i"><use href="#i-lang"/></svg><span>Xem bản gốc tiếng Anh</span></button>
       <p class="hint" id="updated-mobile"></p>
     </div>

@@ -19,7 +19,7 @@ Thanh bên trái (trên điện thoại là thanh dưới cùng) chuyển giữa
 | Công nghệ & công cụ | 19 công nghệ (AI Agent, MCP, RAG…) kèm giải thích và số lần được nhắc; mô hình mới; mô hình mở và ứng dụng đang hot | tính từ các nguồn khác, [OpenRouter](https://openrouter.ai/models), [Hugging Face](https://huggingface.co) |
 | Ý tưởng | Dành cho dev web: 19 bài toán thật của nghề web. Tia lửa hôm nay (thứ đang hot ghép với một bài toán thật); bàn ghép bài toán × công nghệ; bản đồ nút thắt chung nối các bài toán; tự chấm điểm và sổ ý tưởng (lưu trong trình duyệt) | Bài toán và nút thắt trong `lib/problems.js`, ghép với dữ liệu các tab khác |
 | Nghiên cứu | Paper được thích nhiều nhất | [Hugging Face Papers](https://huggingface.co/papers) |
-| AI giỏi tới đâu | Kỷ lục làm web và lập trình: WebDev Arena, CursorBench, SWE-bench Verified, Terminal-Bench, METR | [Epoch AI](https://epoch.ai/benchmarks) |
+| Cuộc đua model | Giá so với điểm (model rẻ nhất ở mỗi mức điểm), điểm cao nhất theo hãng theo thời gian, mã nguồn mở đi sau bao xa, bảng xếp hạng sắp xếp/lọc được; kỷ lục WebDev Arena, CursorBench, SWE-bench Verified, Terminal-Bench, METR | [Epoch AI](https://epoch.ai/benchmarks), giá từ [OpenRouter](https://openrouter.ai/models) |
 
 Tiêu đề, tóm tắt và mô tả tiếng Anh được dịch sang tiếng Việt bằng Google Dịch lúc lấy dữ liệu (`lib/translate.js`); nút "Bản gốc" chuyển về tiếng Anh. Danh sách công nghệ và lời giải thích nằm trong `lib/tech.js`.
 
@@ -45,7 +45,7 @@ lib/news.js      danh sách nguồn, gom cụm tin, đếm xu hướng
 lib/feed.js      đọc RSS/Atom
 lib/models.js    mô hình mới (OpenRouter)
 lib/papers.js    paper nổi bật (Hugging Face)
-lib/progress.js  kỷ lục benchmark (Epoch AI)
+lib/progress.js  kỷ lục benchmark và cuộc đua model (Epoch AI + giá OpenRouter)
 lib/repos.js     repo AI hot (GitHub Trending + Search API)
 lib/tools.js     mô hình và ứng dụng đang hot (Hugging Face)
 lib/tech.js      công nghệ đang hot, đếm từ repo, tin tức và Hugging Face
