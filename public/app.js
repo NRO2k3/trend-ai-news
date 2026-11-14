@@ -1,12 +1,15 @@
 'use strict';
 
 const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => [...document.querySelectorAll(sel)];
 const esc = (s = '') => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u : '#');
+const nf0 = new Intl.NumberFormat('vi-VN');
 const nf1 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 const DAY = 86400e3;
 const REFRESH_MS = 15 * 60e3;
 
+const TABS = ['tong-quan', 'tin-tuc', 'repo', 'cong-nghe', 'nghien-cuu', 'ky-luc'];
 const CATS = { all: 'Tất cả', lab: 'Công ty AI', media: 'Báo nước ngoài', research: 'Nghiên cứu', community: 'Blog & diễn đàn', vn: 'Báo Việt' };
 const RANGES = { 1: '24 giờ qua', 3: '3 ngày qua', 7: '7 ngày qua', 30: '30 ngày qua' };
 const PROVIDERS = {
@@ -18,8 +21,8 @@ const PROVIDERS = {
 };
 const EFFORT = { low: 'suy nghĩ ít', medium: 'suy nghĩ vừa', high: 'suy nghĩ nhiều', xhigh: 'suy nghĩ rất nhiều', max: 'suy nghĩ tối đa' };
 
-const state = { cat: 'all', days: 3, q: '', source: '', trend: null, limit: 40, lang: 'vi' };
-const data = { news: null, models: null, papers: null, progress: null };
+const state = { cat: 'all', days: 3, q: '', source: '', trend: null, limit: 40, lang: 'vi', repoMode: 'trending' };
+const data = { news: null, models: null, papers: null, progress: null, repos: null, tools: null, tech: null };
 
 // ---------- helpers ----------
 
@@ -41,12 +44,22 @@ function dayLabel(iso) {
   return d.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' });
 }
 
+// "6,9 triệu", "12 nghìn"
+function big(n) {
+  if (n >= 1e6) return `${nf1.format(n / 1e6)} triệu`;
+  if (n >= 1e4) return `${nf0.format(Math.round(n / 1e3))} nghìn`;
+  return nf0.format(n);
+}
+
 // Vietnamese machine translation when available and wanted, otherwise the original.
 const tx = (obj, field) => (state.lang === 'vi' && obj[`${field}Vi`]) || obj[field] || '';
 
+const link = (url, text, cls = '') =>
+  `<a${cls ? ` class="${cls}"` : ''} href="${esc(safeUrl(url))}" target="_blank" rel="noopener noreferrer">${text}</a>`;
 const translateUrl = (url) => `https://translate.google.com/translate?sl=auto&tl=vi&u=${encodeURIComponent(url)}`;
 const thumb = (src, cls = 'thumb') =>
   src ? `<img class="${cls}" src="${esc(safeUrl(src))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
+const avatar = (owner) => `<img class="avatar" src="https://github.com/${encodeURIComponent(owner)}.png?size=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
 const providerName = (id) => PROVIDERS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
 
 // "claude-opus-4-7_max" → "Claude Opus 4.7"; the suffix is the reasoning effort.
@@ -80,26 +93,62 @@ async function api(name, force) {
   return body;
 }
 
-function fail(el, err) {
-  $(el).innerHTML = `<p class="error">Không tải được dữ liệu (${esc(err.message)}). Thử bấm “Làm mới”.</p>`;
+function fail(selectors, err) {
+  for (const sel of selectors) {
+    const el = $(sel);
+    if (el) el.innerHTML = `<p class="error">Không tải được dữ liệu (${esc(err.message)}). Thử bấm “Làm mới”.</p>`;
+  }
 }
 
-// ---------- pulse tiles ----------
+function setHTML(sel, html) {
+  const el = $(sel);
+  if (el) el.innerHTML = html;
+}
+
+// ---------- tabs ----------
+
+function route() {
+  const tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tong-quan';
+  for (const page of $$('.page')) page.hidden = page.dataset.page !== tab;
+  for (const a of $$('.tabs a')) {
+    if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  }
+  $(`.tabs a[data-tab="${tab}"]`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  document.title = tab === 'tong-quan' ? 'Xu hướng AI' : `${$(`.tabs a[data-tab="${tab}"]`)?.textContent} · Xu hướng AI`;
+}
+
+function goTab(tab) {
+  if (location.hash.slice(1) !== tab) location.hash = tab;
+  else route();
+  window.scrollTo(0, 0);
+}
+
+// Sticky header + tabs height, so the news filters stick right below them.
+function measureSticky() {
+  const h = $('#sticky')?.offsetHeight;
+  if (h) document.documentElement.style.setProperty('--stick', `${h}px`);
+}
+
+// ---------- overview ----------
 
 function renderPulse() {
-  const { news, models, progress } = data;
+  const { news, models, repos, progress } = data;
   const tiles = [];
   if (news) {
     const day = news.items.filter((it) => Date.now() - Date.parse(it.date) < DAY).length;
     const ok = news.sources.filter((s) => s.ok).length;
-    tiles.push({ label: 'Tin mới trong 24 giờ qua', value: day, note: `tổng hợp từ ${ok} nguồn tin` });
-    const top = news.trends.find((t) => t.kind === 'org');
-    if (top) tiles.push({ label: 'Công ty được nói tới nhiều nhất', value: esc(top.name), note: `xuất hiện trong ${top.now} bài tuần này`, small: true });
+    tiles.push({ tab: 'tin-tuc', label: 'Tin mới trong 24 giờ qua', value: day, note: `tổng hợp từ ${ok} nguồn tin` });
+  }
+  if (repos?.trending.length) {
+    const top = repos.trending[0];
+    tiles.push({ tab: 'repo', label: 'Repo AI hot nhất tuần', value: esc(top.name.split('/')[1]), note: `+${nf0.format(top.week || top.today)} sao trong tuần`, small: true });
   }
   if (models) {
     const lead = models.byProvider[0];
     tiles.push({
-      label: 'Mô hình AI mới ra mắt (30 ngày)',
+      tab: 'cong-nghe',
+      label: 'Mô hình AI mới (30 ngày)',
       value: models.last30,
       note: lead ? `ra nhiều nhất: ${esc(providerName(lead.provider))} (${lead.count})` : '',
     });
@@ -110,16 +159,101 @@ function renderPulse() {
       .sort((x, y) => Date.parse(y.r.date) - Date.parse(x.r.date))[0];
     if (latest) {
       tiles.push({
-        label: 'Kỷ lục mới nhất',
+        tab: 'ky-luc',
+        label: 'Kỷ lục AI mới nhất',
         value: esc(modelName(latest.r.model)),
         note: `${esc(latest.b.title)}: ${fmtScore(latest.b.kind, latest.r.score)}`,
         small: true,
       });
     }
   }
-  $('#pulse').innerHTML = tiles
-    .map((t) => `<div class="tile"><div class="label">${t.label}</div><div class="value${t.small ? ' small' : ''}">${t.value}</div><div class="note">${t.note}</div></div>`)
-    .join('');
+  setHTML(
+    '#pulse',
+    tiles
+      .map((t) => `<a class="tile" href="#${t.tab}"><div class="label">${t.label}</div><div class="value${t.small ? ' small' : ''}">${t.value}</div><div class="note">${t.note}</div></a>`)
+      .join(''),
+  );
+}
+
+function renderOverviewHot() {
+  const hot = data.news.hot.slice(0, 4);
+  setHTML(
+    '#ov-hot',
+    hot.length
+      ? hot
+          .map(
+            (c) => `<div class="ov-row">
+              ${link(c.lead.url, esc(tx(c.lead, 'title')), 'ov-title')}
+              <div class="meta"><span class="count">${c.sourceCount} nguồn</span><span>${ago(c.latest)}</span></div>
+            </div>`,
+          )
+          .join('')
+      : '<p class="empty">Chưa có tin nóng.</p>',
+  );
+}
+
+function renderOverviewRepos() {
+  setHTML(
+    '#ov-repos',
+    data.repos.trending
+      .slice(0, 5)
+      .map(
+        (r) => `<div class="ov-row with-avatar">
+          ${avatar(r.name.split('/')[0])}
+          <div>
+            ${link(r.url, `${esc(r.name.split('/')[0])}/<b>${esc(r.name.split('/')[1])}</b>`, 'ov-title')}
+            <div class="ov-desc">${esc(tx(r, 'description'))}</div>
+            <div class="meta"><span class="up">▲ ${nf0.format(r.week || r.today)} sao tuần này</span><span>·</span><span>★ ${big(r.stars)}</span></div>
+          </div>
+        </div>`,
+      )
+      .join(''),
+  );
+}
+
+function renderOverviewTech() {
+  const list = data.tech.techs.slice(0, 6);
+  setHTML(
+    '#ov-tech',
+    list
+      .map(
+        (t) => `<a class="ov-row tech-mini" href="#cong-nghe">
+          <div class="tech-mini-head"><b>${esc(t.name)}</b><span class="muted">${t.total} lượt nhắc</span></div>
+          <div class="ov-desc">${esc(t.what)}</div>
+        </a>`,
+      )
+      .join(''),
+  );
+}
+
+function renderOverviewModels() {
+  setHTML(
+    '#ov-models',
+    data.models.models
+      .slice(0, 5)
+      .map(
+        (m) => `<div class="ov-row">
+          ${link(m.url, esc(m.name.replace(/^[^:]+:\s*/, '')), 'ov-title')}
+          <div class="meta"><span class="src">${esc(providerName(m.provider))}</span><span>·</span><span>${ago(m.created)}</span>${m.free ? '<span class="tag">Miễn phí</span>' : ''}</div>
+        </div>`,
+      )
+      .join(''),
+  );
+}
+
+function renderOverviewBench() {
+  setHTML(
+    '#ov-bench',
+    data.progress.benchmarks
+      .map(
+        (b) => `<a class="ov-stat" href="#ky-luc">
+          <div class="label">${esc(b.title)}</div>
+          <div class="value">${fmtScore(b.kind, b.leader.score)}</div>
+          <div class="note">${esc(b.caption)}</div>
+        </a>`,
+      )
+      .join(''),
+  );
 }
 
 // ---------- benchmarks ----------
@@ -161,50 +295,55 @@ function sparkline(b, i) {
 
 function renderProgress(progress) {
   data.progress = progress;
-  $('#bench').innerHTML = progress.benchmarks
-    .map((b, i) => {
-      const L = b.leader;
-      let delta = '';
-      if (b.yearAgo) {
-        const change =
-          b.kind === 'minutes'
-            ? `<b>gấp ${nf1.format(L.score / b.yearAgo.score)} lần</b>`
-            : `<b>tăng ${nf1.format((L.score - b.yearAgo.score) * 100)} điểm</b>`;
-        delta = `1 năm trước chỉ ${fmtScore(b.kind, b.yearAgo.score)} → ${change}`;
-      }
-      const rows = b.top
-        .map(
-          (t) =>
-            `<tr><td>${esc(modelName(t.model))} <small>(${esc(t.org)})</small>${effortOf(t.model) ? `<br><small>${effortOf(t.model)} · ${fmtDate(t.date)}</small>` : `<br><small>${fmtDate(t.date)}</small>`}</td><td>${fmtScore(b.kind, t.score)}</td></tr>`,
-        )
-        .join('');
-      return `<article class="bench">
-        <h3>${esc(b.title)}</h3>
-        <div class="orig">Bài kiểm tra: ${esc(b.name)}</div>
-        <div class="desc">${esc(b.desc)}</div>
-        <div class="big">${fmtScore(b.kind, L.score)}</div>
-        <div class="caption">${esc(b.caption)}</div>
-        <div class="who">Dẫn đầu: <strong>${esc(modelName(L.model))}</strong> của ${esc(L.org)}</div>
-        ${delta ? `<div class="delta">${delta}</div>` : ''}
-        ${sparkline(b, i)}
-        <div class="axis"><span>${new Date(b.record[0].date).getFullYear()}</span><span>hiện nay</span></div>
-        <details><summary>Xem 5 mô hình đứng đầu (trong ${b.evaluated} mô hình đã thử)</summary><table>${rows}</table></details>
-      </article>`;
-    })
-    .join('');
+  setHTML(
+    '#bench',
+    progress.benchmarks
+      .map((b, i) => {
+        const L = b.leader;
+        let delta = '';
+        if (b.yearAgo) {
+          const change =
+            b.kind === 'minutes'
+              ? `<b>gấp ${nf1.format(L.score / b.yearAgo.score)} lần</b>`
+              : `<b>tăng ${nf1.format((L.score - b.yearAgo.score) * 100)} điểm</b>`;
+          delta = `1 năm trước chỉ ${fmtScore(b.kind, b.yearAgo.score)} → ${change}`;
+        }
+        const rows = b.top
+          .map(
+            (t) =>
+              `<tr><td>${esc(modelName(t.model))} <small>(${esc(t.org)})</small><br><small>${effortOf(t.model) ? `${effortOf(t.model)} · ` : ''}${fmtDate(t.date)}</small></td><td>${fmtScore(b.kind, t.score)}</td></tr>`,
+          )
+          .join('');
+        return `<article class="bench">
+          <h3>${esc(b.title)}</h3>
+          <div class="orig">Bài kiểm tra: ${esc(b.name)}</div>
+          <div class="desc">${esc(b.desc)}</div>
+          <div class="big">${fmtScore(b.kind, L.score)}</div>
+          <div class="caption">${esc(b.caption)}</div>
+          <div class="who">Dẫn đầu: <strong>${esc(modelName(L.model))}</strong> của ${esc(L.org)}</div>
+          ${delta ? `<div class="delta">${delta}</div>` : ''}
+          ${sparkline(b, i)}
+          <div class="axis"><span>${new Date(b.record[0].date).getFullYear()}</span><span>hiện nay</span></div>
+          <details><summary>Xem 5 mô hình đứng đầu (trong ${b.evaluated} mô hình đã thử)</summary><table>${rows}</table></details>
+        </article>`;
+      })
+      .join(''),
+  );
+  renderOverviewBench();
   renderPulse();
 }
 
 // Crosshair-style hover: snap to the nearest record point.
 function initSparkHover() {
   const tip = $('#tip');
+  const host = $('#bench');
   let lastDot = null;
   const clear = () => {
     tip.hidden = true;
     lastDot?.classList.remove('on');
     lastDot = null;
   };
-  $('#bench').addEventListener('mousemove', (e) => {
+  host.addEventListener('mousemove', (e) => {
     const svg = e.target.closest('.spark');
     if (!svg || !data.progress) return clear();
     const b = data.progress.benchmarks[svg.dataset.i];
@@ -223,7 +362,7 @@ function initSparkHover() {
     tip.style.left = `${Math.min(window.innerWidth - tip.offsetWidth - 8, Math.max(8, tx - tip.offsetWidth / 2))}px`;
     tip.style.top = `${ty - tip.offsetHeight - 12}px`;
   });
-  $('#bench').addEventListener('mouseleave', clear);
+  host.addEventListener('mouseleave', clear);
 }
 
 // ---------- news ----------
@@ -240,28 +379,31 @@ function metaRow(it, extra = '') {
 function renderHot() {
   const news = data.news;
   if (!news.hot.length) {
-    $('#hot').innerHTML = '<p class="empty">Chưa có sự kiện nào được nhiều báo cùng đưa trong vài ngày qua.</p>';
+    setHTML('#hot', '<p class="empty">Chưa có sự kiện nào được nhiều báo cùng đưa trong vài ngày qua.</p>');
     return;
   }
-  $('#hot').innerHTML = news.hot
-    .map((c) => {
-      const it = c.lead;
-      const related = c.related
-        .slice(0, 6)
-        .map((r) => `<li><b>${esc(r.sourceName)}:</b> <a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">${esc(tx(r, 'title'))}</a></li>`)
-        .join('');
-      const summary = tx(it, 'summary');
-      return `<article class="hot">
-        <div>
-          ${metaRow(it, `<span class="count">${c.sourceCount} nguồn cùng đưa tin</span>`)}
-          <a class="title" href="${esc(safeUrl(it.url))}" target="_blank" rel="noopener noreferrer">${esc(tx(it, 'title'))}</a>
-          ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
-          ${related ? `<div class="related-label">Các nguồn khác viết:</div><ul class="related">${related}</ul>` : ''}
-        </div>
-        ${thumb(it.image)}
-      </article>`;
-    })
-    .join('');
+  setHTML(
+    '#hot',
+    news.hot
+      .map((c) => {
+        const it = c.lead;
+        const related = c.related
+          .slice(0, 6)
+          .map((r) => `<li><b>${esc(r.sourceName)}:</b> ${link(r.url, esc(tx(r, 'title')))}</li>`)
+          .join('');
+        const summary = tx(it, 'summary');
+        return `<article class="hot">
+          <div>
+            ${metaRow(it, `<span class="count">${c.sourceCount} nguồn cùng đưa tin</span>`)}
+            ${link(it.url, esc(tx(it, 'title')), 'title')}
+            ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
+            ${related ? `<div class="related-label">Các nguồn khác viết:</div><ul class="related">${related}</ul>` : ''}
+          </div>
+          ${thumb(it.image)}
+        </article>`;
+      })
+      .join(''),
+  );
 }
 
 function filteredItems() {
@@ -288,44 +430,51 @@ function renderChips() {
     counts.all++;
     counts[it.cat] = (counts[it.cat] ?? 0) + 1;
   }
-  $('#cats').innerHTML = Object.entries(CATS)
-    .map(
-      ([k, label]) =>
-        `<button class="chip" type="button" data-cat="${k}" aria-pressed="${state.cat === k}">${k !== 'all' ? `<span class="dot cat-${k}"></span>` : ''}${label}<span class="n">${counts[k] ?? 0}</span></button>`,
-    )
-    .join('');
+  setHTML(
+    '#cats',
+    Object.entries(CATS)
+      .map(
+        ([k, label]) =>
+          `<button class="chip" type="button" data-cat="${k}" aria-pressed="${state.cat === k}">${k !== 'all' ? `<span class="dot cat-${k}"></span>` : ''}${label}<span class="n">${counts[k] ?? 0}</span></button>`,
+      )
+      .join(''),
+  );
 }
 
 function renderRiver() {
   if (!data.news) return;
   renderChips();
   const list = filteredItems();
-  $('#active-filter').innerHTML = state.trend
-    ? `Đang xem tin về: <strong>${esc(state.trend.name)}</strong> <button type="button" id="clear-trend">Bỏ lọc ✕</button>`
-    : '';
+  setHTML(
+    '#active-filter',
+    state.trend ? `Đang xem tin về: <strong>${esc(state.trend.name)}</strong> <button type="button" id="clear-trend">Bỏ lọc ✕</button>` : '',
+  );
   if (!list.length) {
-    $('#river').innerHTML = '<p class="empty">Không có tin nào khớp. Thử chọn khoảng thời gian dài hơn hoặc bỏ bớt điều kiện lọc.</p>';
+    setHTML('#river', '<p class="empty">Không có tin nào khớp. Thử chọn khoảng thời gian dài hơn hoặc bỏ bớt điều kiện lọc.</p>');
     $('#more').hidden = true;
     return;
   }
   let lastDay = '';
-  $('#river').innerHTML = list
-    .slice(0, state.limit)
-    .map((it) => {
-      const day = dayLabel(it.date);
-      const head = day !== lastDay ? `<h3 class="day">${day}</h3>` : '';
-      lastDay = day;
-      const summary = tx(it, 'summary');
-      return `${head}<article class="item">
-        <div>
-          ${metaRow(it)}
-          <a class="title" href="${esc(safeUrl(it.url))}" target="_blank" rel="noopener noreferrer">${esc(tx(it, 'title'))}</a>
-          ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
-        </div>
-        ${thumb(it.image)}
-      </article>`;
-    })
-    .join('');
+  setHTML(
+    '#river',
+    list
+      .slice(0, state.limit)
+      .map((it) => {
+        const day = dayLabel(it.date);
+        const head = day !== lastDay ? `<h3 class="day">${day}</h3>` : '';
+        lastDay = day;
+        const summary = tx(it, 'summary');
+        return `${head}<article class="item">
+          <div>
+            ${metaRow(it)}
+            ${link(it.url, esc(tx(it, 'title')), 'title')}
+            ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
+          </div>
+          ${thumb(it.image)}
+        </article>`;
+      })
+      .join(''),
+  );
   $('#more').hidden = list.length <= state.limit;
   $('#more').textContent = `Xem thêm (còn ${list.length - state.limit} tin)`;
 }
@@ -337,24 +486,27 @@ function renderTrends() {
     ['topic', 'Chủ đề'],
   ];
   const max = Math.max(1, ...news.trends.map((t) => t.now));
-  $('#trends').innerHTML = groups
-    .map(([kind, title]) => {
-      const rows = news.trends
-        .filter((t) => t.kind === kind && (t.now || t.before))
-        .slice(0, 8)
-        .map((t) => {
-          const diff = t.now - t.before;
-          const delta = diff > 0 ? `<small class="up">▲${diff}</small>` : diff < 0 ? `<small class="down">▼${-diff}</small>` : '<small>=</small>';
-          return `<button class="trend" type="button" data-trend="${esc(t.name)}" title="${t.now} bài tuần này, ${t.before} bài tuần trước. Bấm để xem các tin này.">
-            <span class="name">${esc(t.name)}</span>
-            <span><span class="bar" style="display:block;width:${(t.now / max) * 100}%"></span></span>
-            <span class="val">${t.now} ${delta}</span>
-          </button>`;
-        })
-        .join('');
-      return rows ? `<div class="trend-group">${title}</div>${rows}` : '';
-    })
-    .join('');
+  setHTML(
+    '#trends',
+    groups
+      .map(([kind, title]) => {
+        const rows = news.trends
+          .filter((t) => t.kind === kind && (t.now || t.before))
+          .slice(0, 8)
+          .map((t) => {
+            const diff = t.now - t.before;
+            const delta = diff > 0 ? `<small class="up">▲${diff}</small>` : diff < 0 ? `<small class="down">▼${-diff}</small>` : '<small>=</small>';
+            return `<button class="trend" type="button" data-trend="${esc(t.name)}" title="${t.now} bài tuần này, ${t.before} bài tuần trước. Bấm để xem các tin này.">
+              <span class="name">${esc(t.name)}</span>
+              <span><span class="bar" style="display:block;width:${(t.now / max) * 100}%"></span></span>
+              <span class="val">${t.now} ${delta}</span>
+            </button>`;
+          })
+          .join('');
+        return rows ? `<div class="trend-group">${title}</div>${rows}` : '';
+      })
+      .join(''),
+  );
 }
 
 function renderSources() {
@@ -365,12 +517,15 @@ function renderSources() {
     '<option value="">Mọi nguồn</option>' +
     news.sources.filter((s) => s.ok).map((s) => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
   sel.value = current;
-  $('#sources').innerHTML = `<ul class="src-list">${news.sources
-    .map(
-      (s) =>
-        `<li><span class="dot cat-${s.cat}" title="${CATS[s.cat]}"></span>${esc(s.name)}<span class="n ${s.ok ? '' : 'bad'}" title="${esc(s.error ?? '')}">${s.ok ? `${s.count} tin` : 'lỗi'}</span></li>`,
-    )
-    .join('')}</ul>`;
+  setHTML(
+    '#sources',
+    `<ul class="src-list">${news.sources
+      .map(
+        (s) =>
+          `<li><span class="dot cat-${s.cat}" title="${CATS[s.cat]}"></span>${esc(s.name)}<span class="n ${s.ok ? '' : 'bad'}" title="${esc(s.error ?? '')}">${s.ok ? `${s.count} tin` : 'lỗi'}</span></li>`,
+      )
+      .join('')}</ul>`,
+  );
 }
 
 // On a static host the data is only as fresh as the last scheduled build, so say how old it is.
@@ -387,60 +542,173 @@ function renderNews(news) {
   renderTrends();
   renderSources();
   renderRiver();
+  renderOverviewHot();
   renderPulse();
 }
 
-// ---------- models & papers ----------
+// ---------- repos ----------
+
+function renderRepos(repos) {
+  data.repos = repos;
+  const rising = state.repoMode === 'rising';
+  const list = rising ? repos.rising : repos.trending;
+  for (const b of $$('#repo-mode button')) b.setAttribute('aria-pressed', b.dataset.mode === state.repoMode);
+  setHTML(
+    '#repo-hint',
+    rising
+      ? 'Repo về AI được tạo trong 30 ngày qua, xếp theo tổng số sao.'
+      : 'Repo về AI trên <a href="https://github.com/trending?since=weekly" target="_blank" rel="noopener">GitHub Trending</a>, xếp theo số sao tăng thêm trong tuần.',
+  );
+  if (!list.length) {
+    setHTML('#repos', `<p class="empty">${rising && repos.risingError ? 'Chưa lấy được danh sách repo mới (GitHub giới hạn lượt truy cập). Lần cập nhật sau sẽ có.' : 'Chưa có dữ liệu.'}</p>`);
+  } else {
+    setHTML(
+      '#repos',
+      list
+        .map((r, i) => {
+          const [owner, name] = r.name.split('/');
+          const growth = rising
+            ? `<span>tạo ${ago(r.created)}</span>`
+            : `<span class="up">▲ ${nf0.format(r.week || r.today)} sao ${r.week ? 'tuần này' : 'hôm nay'}</span>`;
+          const topics = (r.topics ?? []).slice(0, 5).map((t) => `<span class="tag">${esc(t)}</span>`).join('');
+          return `<article class="repo">
+            <div class="rank">${i + 1}</div>
+            ${avatar(owner)}
+            <div class="repo-body">
+              ${link(r.url, `${esc(owner)}/<b>${esc(name)}</b>`, 'repo-name')}
+              ${r.description ? `<p>${esc(tx(r, 'description'))}</p>` : ''}
+              <div class="meta">${growth}<span>·</span><span>★ ${nf0.format(r.stars)} sao</span>${r.language ? `<span>·</span><span>${esc(r.language)}</span>` : ''}${topics}</div>
+            </div>
+          </article>`;
+        })
+        .join(''),
+    );
+  }
+  renderOverviewRepos();
+  renderPulse();
+}
+
+// ---------- tech & tools ----------
+
+function renderTech(tech) {
+  data.tech = tech;
+  const max = Math.max(1, ...tech.techs.map((t) => t.total));
+  setHTML(
+    '#tech',
+    tech.techs
+      .map((t, i) => {
+        const parts = [
+          t.repos ? `${t.repos} repo hot` : '',
+          t.news ? `${t.news} bài báo` : '',
+          t.hf ? `${t.hf} mô hình/ứng dụng` : '',
+        ].filter(Boolean);
+        const examples = t.examples.map((e) => link(e.url, esc(e.name))).join(', ');
+        const headline = t.headline ? `<div class="tech-news">📰 ${link(t.headline.url, esc(tx(t.headline, 'title')))} <span class="muted">— ${esc(t.headline.source)}</span></div>` : '';
+        return `<article class="tech${i < 3 ? ' top' : ''}">
+          <div class="tech-head"><h3>${esc(t.name)}</h3><span class="tech-count">${t.total}</span></div>
+          <div class="tech-bar"><span style="width:${(t.total / max) * 100}%"></span></div>
+          <p>${esc(t.what)}</p>
+          <div class="meta">${parts.join(' · ')}</div>
+          ${examples ? `<div class="tech-ex">Ví dụ: ${examples}</div>` : ''}
+          ${headline}
+        </article>`;
+      })
+      .join(''),
+  );
+  renderOverviewTech();
+}
 
 let showAllModels = false;
 
 function renderModels(models) {
   data.models = models;
-  $('#models-sub').innerHTML = `${models.last30} mô hình mới trong 30 ngày qua · theo <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a>`;
+  setHTML('#models-sub', `${models.last30} mô hình mới trong 30 ngày qua · theo <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a>`);
   const list = showAllModels ? models.models : models.models.slice(0, 8);
-  $('#models').innerHTML =
+  setHTML(
+    '#models',
     `<div class="providers"><span class="muted">Hãng ra nhiều nhất:</span>${models.byProvider
       .slice(0, 6)
       .map((p) => `<span class="tag">${esc(providerName(p.provider))} ${p.count}</span>`)
       .join('')}</div>` +
-    list
-      .map((m) => {
-        const desc = tx(m, 'description');
-        return `<div class="mini">
-          <a class="name" href="${esc(safeUrl(m.url))}" target="_blank" rel="noopener noreferrer">${esc(m.name.replace(/^[^:]+:\s*/, ''))}</a>
-          <div class="meta"><span class="src">${esc(providerName(m.provider))}</span><span>·</span><span>ra mắt ${ago(m.created)}</span>${m.free ? '<span>·</span><span class="tag">Miễn phí</span>' : ''}</div>
-          ${desc ? `<p>${esc(desc)}</p>` : ''}
-        </div>`;
-      })
-      .join('') +
-    (models.models.length > 8 ? `<button class="linkbtn" type="button" id="toggle-models">${showAllModels ? 'Thu gọn' : `Xem tất cả ${models.models.length} mô hình (60 ngày qua)`}</button>` : '');
+      list
+        .map((m) => {
+          const desc = tx(m, 'description');
+          return `<div class="mini">
+            ${link(m.url, esc(m.name.replace(/^[^:]+:\s*/, '')), 'name')}
+            <div class="meta"><span class="src">${esc(providerName(m.provider))}</span><span>·</span><span>ra mắt ${ago(m.created)}</span>${m.free ? '<span>·</span><span class="tag">Miễn phí</span>' : ''}</div>
+            ${desc ? `<p>${esc(desc)}</p>` : ''}
+          </div>`;
+        })
+        .join('') +
+      (models.models.length > 8 ? `<button class="linkbtn" type="button" id="toggle-models">${showAllModels ? 'Thu gọn' : `Xem tất cả ${models.models.length} mô hình (60 ngày qua)`}</button>` : ''),
+  );
+  renderOverviewModels();
   renderPulse();
 }
 
+function renderTools(tools) {
+  data.tools = tools;
+  setHTML(
+    '#hf-models',
+    tools.models
+      .slice(0, 12)
+      .map(
+        (m) => `<div class="mini">
+          ${link(m.url, esc(m.id.split('/')[1]), 'name')}
+          <div class="meta"><span class="src">${esc(m.author)}</span>${m.taskVi ? `<span>·</span><span class="tag">${esc(m.taskVi)}</span>` : ''}</div>
+          <div class="meta"><span>♥ ${big(m.likes)} lượt thích</span><span>·</span><span>⬇ ${big(m.downloads)} lượt tải</span></div>
+        </div>`,
+      )
+      .join(''),
+  );
+  setHTML(
+    '#hf-spaces',
+    tools.spaces
+      .slice(0, 12)
+      .map((s) => {
+        const desc = tx(s, 'description');
+        return `<div class="mini">
+          ${link(s.url, `${s.emoji ? `${esc(s.emoji)} ` : ''}${esc(s.title)}`, 'name')}
+          <div class="meta"><span class="src">${esc(s.author)}</span><span>·</span><span>♥ ${big(s.likes)}</span></div>
+          ${desc ? `<p>${esc(desc)}</p>` : ''}
+        </div>`;
+      })
+      .join(''),
+  );
+}
+
+// ---------- papers ----------
+
 function renderPapers(res) {
   data.papers = res;
-  $('#papers').innerHTML = res.papers
-    .slice(0, 8)
-    .map((p) => {
-      const summary = tx(p, 'summary');
-      return `<div class="mini">
-        <a class="name" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${esc(tx(p, 'title'))}</a>
-        <div class="meta"><span class="votes">▲ ${p.upvotes} lượt thích</span>${p.org ? `<span>·</span><span>${esc(p.org)}</span>` : ''}</div>
-        ${summary ? `<p>${esc(summary)}</p>` : ''}
-      </div>`;
-    })
-    .join('');
+  setHTML(
+    '#papers',
+    res.papers
+      .slice(0, 24)
+      .map((p) => {
+        const summary = tx(p, 'summary');
+        return `<article class="paper">
+          ${link(p.url, esc(tx(p, 'title')), 'name')}
+          <div class="meta"><span class="votes">▲ ${p.upvotes} lượt thích</span>${p.org ? `<span>·</span><span>${esc(p.org)}</span>` : ''}<span>·</span><span>${ago(p.date)}</span></div>
+          ${summary ? `<p>${esc(summary)}</p>` : ''}
+        </article>`;
+      })
+      .join(''),
+  );
 }
 
 // Re-render every text that has a Vietnamese version.
 function renderLanguage() {
   const btn = $('#lang');
   if (btn) {
-    btn.textContent = state.lang === 'vi' ? 'Xem bản gốc' : 'Xem tiếng Việt';
+    btn.textContent = state.lang === 'vi' ? 'Bản gốc' : 'Tiếng Việt';
     btn.title = state.lang === 'vi' ? 'Đang hiện bản dịch tiếng Việt. Bấm để xem tiêu đề gốc tiếng Anh.' : 'Đang hiện bản gốc. Bấm để xem bản dịch tiếng Việt.';
   }
-  if (data.news) { renderHot(); renderRiver(); }
+  if (data.news) { renderHot(); renderRiver(); renderOverviewHot(); }
+  if (data.repos) renderRepos(data.repos);
+  if (data.tech) renderTech(data.tech);
   if (data.models) renderModels(data.models);
+  if (data.tools) renderTools(data.tools);
   if (data.papers) renderPapers(data.papers);
 }
 
@@ -450,11 +718,15 @@ async function loadAll(force = false) {
   const btn = $('#refresh');
   btn.disabled = true;
   btn.textContent = 'Đang tải…';
+  const load = (name, render, targets) => api(name, force).then(render).catch((e) => fail(targets, e));
   await Promise.all([
-    api('news', force).then(renderNews).catch((e) => { fail('#hot', e); fail('#river', e); }),
-    api('models', force).then(renderModels).catch((e) => fail('#models', e)),
-    api('papers', force).then(renderPapers).catch((e) => fail('#papers', e)),
-    api('progress', force).then(renderProgress).catch((e) => fail('#bench', e)),
+    load('news', renderNews, ['#hot', '#river', '#ov-hot']),
+    load('repos', renderRepos, ['#repos', '#ov-repos']),
+    load('tech', renderTech, ['#tech', '#ov-tech']),
+    load('models', renderModels, ['#models', '#ov-models']),
+    load('tools', renderTools, ['#hf-models', '#hf-spaces']),
+    load('papers', renderPapers, ['#papers']),
+    load('progress', renderProgress, ['#bench', '#ov-bench']),
   ]);
   btn.disabled = false;
   btn.textContent = 'Làm mới';
@@ -501,7 +773,23 @@ function initControls() {
     showAllModels = !showAllModels;
     renderModels(data.models);
   });
+  $('#repo-mode').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || !data.repos) return;
+    state.repoMode = b.dataset.mode;
+    renderRepos(data.repos);
+  });
   $('#refresh').addEventListener('click', () => loadAll(true));
+
+  // In-page "Xem tất cả →" links and tiles switch tabs and start at the top.
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a || !TABS.includes(a.getAttribute('href').slice(1))) return;
+    e.preventDefault();
+    goTab(a.getAttribute('href').slice(1));
+  });
+  addEventListener('hashchange', route);
+  addEventListener('resize', measureSticky);
 
   $('#lang')?.addEventListener('click', () => {
     state.lang = state.lang === 'vi' ? 'en' : 'vi';
@@ -527,6 +815,8 @@ try {
 // script; a missing control must never stop the data from loading.
 try {
   initControls();
+  route();
+  measureSticky();
   renderLanguage();
   initSparkHover();
 } catch (err) {

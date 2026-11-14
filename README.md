@@ -1,6 +1,6 @@
 # Xu hướng AI
 
-Trang tổng hợp để xem thế giới AI đang chạy tới đâu: tin tức, mô hình mới, nghiên cứu nổi bật và kỷ lục benchmark. Không cần cài thư viện, chỉ cần Node.js 20 trở lên.
+Trang tin AI thế giới bằng tiếng Việt: tin tức, repo GitHub đang hot, công nghệ và công cụ AI đang được dùng nhiều, nghiên cứu nổi bật và kỷ lục AI. Không cần cài thư viện, chỉ cần Node.js 20 trở lên.
 
 ```bash
 npm start
@@ -10,14 +10,17 @@ Mở http://localhost:5050 (đổi cổng bằng `PORT=8080 npm start`).
 
 ## Trang có gì
 
-| Phần | Nguồn dữ liệu | Tự làm mới |
+Trang chia thành các tab; tab **Tổng quan** tóm tắt mỗi phần vài dòng.
+
+| Tab | Nội dung | Nguồn dữ liệu |
 |---|---|---|
-| Thế giới AI đang ở đâu: kỷ lục GPQA, FrontierMath, SWE-bench, Terminal-Bench, METR | [Epoch AI](https://epoch.ai/benchmarks) | 12 giờ |
-| Tin nóng: một sự kiện được nhiều nguồn cùng đưa thì gom thành một cụm | RSS của 16 nguồn bên dưới | 15 phút |
-| Dòng tin: lọc theo loại nguồn, thời gian, từ khóa; nút "Dịch" mở bản dịch tiếng Việt | như trên | 15 phút |
-| Được nhắc nhiều nhất: công ty/chủ đề nào đang nóng tuần này so với tuần trước | tính từ tin | 15 phút |
-| Mô hình mới ra mắt | [OpenRouter](https://openrouter.ai/models) | 1 giờ |
-| Nghiên cứu nổi bật | [Hugging Face Daily Papers](https://huggingface.co/papers) | 1 giờ |
+| Tin tức | Tin nóng (một sự kiện nhiều báo đưa thì gom thành một cụm), tất cả tin có bộ lọc, công ty/chủ đề được nói tới nhiều | RSS của 16 nguồn bên dưới |
+| Repo hot | Repo AI hot tuần này; repo AI mới tạo tăng sao nhanh trong 30 ngày | [GitHub Trending](https://github.com/trending), GitHub Search API |
+| Công nghệ & công cụ | 19 công nghệ (AI Agent, MCP, RAG…) kèm giải thích và số lần được nhắc; mô hình mới; mô hình mở và ứng dụng đang hot | tính từ các nguồn khác, [OpenRouter](https://openrouter.ai/models), [Hugging Face](https://huggingface.co) |
+| Nghiên cứu | Paper được thích nhiều nhất | [Hugging Face Papers](https://huggingface.co/papers) |
+| AI giỏi tới đâu | Kỷ lục trên GPQA, FrontierMath, SWE-bench, Terminal-Bench, METR | [Epoch AI](https://epoch.ai/benchmarks) |
+
+Tiêu đề, tóm tắt và mô tả tiếng Anh được dịch sang tiếng Việt bằng Google Dịch lúc lấy dữ liệu (`lib/translate.js`); nút "Bản gốc" chuyển về tiếng Anh. Danh sách công nghệ và lời giải thích nằm trong `lib/tech.js`.
 
 Nguồn tin (sửa trong `lib/news.js`, mảng `SOURCES`):
 
@@ -32,12 +35,16 @@ Nguồn tin (sửa trong `lib/news.js`, mảng `SOURCES`):
 ```
 server.js        máy chủ chạy trên máy: tính /data/<tên>.json trực tiếp
 scripts/build.js ghi public/data/*.json để đăng lên host tĩnh
-lib/data.js      danh sách các bộ dữ liệu (news, models, papers, progress)
+lib/data.js      danh sách các bộ dữ liệu (news, repos, tech, models, tools, papers, progress)
 lib/news.js      danh sách nguồn, gom cụm tin, đếm xu hướng
 lib/feed.js      đọc RSS/Atom
 lib/models.js    mô hình mới (OpenRouter)
 lib/papers.js    paper nổi bật (Hugging Face)
 lib/progress.js  kỷ lục benchmark (Epoch AI)
+lib/repos.js     repo AI hot (GitHub Trending + Search API)
+lib/tools.js     mô hình và ứng dụng đang hot (Hugging Face)
+lib/tech.js      công nghệ đang hot, đếm từ repo, tin tức và Hugging Face
+lib/translate.js dịch sang tiếng Việt (Google Dịch, có bộ nhớ đệm)
 public/          giao diện
 ```
 

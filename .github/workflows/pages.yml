@@ -37,6 +37,7 @@ jobs:
         run: node scripts/build.js
         env:
           PREVIOUS_URL: ${{ steps.pages.outputs.base_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Pages lets browsers cache files for 10 minutes; versioned URLs make a new
       # page load its matching script and styles instead of stale copies.

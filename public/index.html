@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Xu hướng AI</title>
+  <meta name="description" content="Tin tức, repo hot, công nghệ và kỷ lục AI thế giới bằng tiếng Việt, tự cập nhật.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%233b5bdb'/><path d='M8 22l5-12 4 8 3-5 4 9' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,93 +12,171 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="top">
-    <div class="wrap top-inner">
-      <div class="brand">
-        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M8 22l5-12 4 8 3-5 4 9"/></svg>
-        <div>
-          <h1>Xu hướng AI</h1>
-          <p>Tin tức AI thế giới bằng tiếng Việt — tự cập nhật</p>
+  <div class="sticky" id="sticky">
+    <header class="top">
+      <div class="wrap top-inner">
+        <a class="brand" href="#tong-quan">
+          <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M8 22l5-12 4 8 3-5 4 9"/></svg>
+          <div>
+            <h1>Xu hướng AI</h1>
+            <p>Tin tức AI thế giới bằng tiếng Việt — tự cập nhật</p>
+          </div>
+        </a>
+        <div class="actions">
+          <span id="updated" class="muted"></span>
+          <button id="lang" class="btn" type="button">Bản gốc</button>
+          <button id="refresh" class="btn" type="button">Làm mới</button>
+          <button id="theme" class="btn icon" type="button" aria-label="Đổi nền sáng/tối" title="Đổi nền sáng/tối">◐</button>
         </div>
       </div>
-      <div class="actions">
-        <span id="updated" class="muted"></span>
-        <button id="lang" class="btn" type="button">Xem bản gốc</button>
-        <button id="refresh" class="btn" type="button">Làm mới</button>
-        <button id="theme" class="btn icon" type="button" aria-label="Đổi nền sáng/tối" title="Đổi nền sáng/tối">◐</button>
+    </header>
+    <nav class="tabs" aria-label="Các mục">
+      <div class="wrap tabs-inner">
+        <a href="#tong-quan" data-tab="tong-quan">Tổng quan</a>
+        <a href="#tin-tuc" data-tab="tin-tuc">Tin tức</a>
+        <a href="#repo" data-tab="repo">Repo hot</a>
+        <a href="#cong-nghe" data-tab="cong-nghe">Công nghệ &amp; công cụ</a>
+        <a href="#nghien-cuu" data-tab="nghien-cuu">Nghiên cứu</a>
+        <a href="#ky-luc" data-tab="ky-luc">AI giỏi tới đâu</a>
       </div>
-    </div>
-  </header>
+    </nav>
+  </div>
 
   <main class="wrap">
-    <section class="pulse" id="pulse" aria-label="Tổng quan"></section>
+    <!-- Tổng quan -->
+    <section class="page" data-page="tong-quan">
+      <div class="pulse" id="pulse" aria-label="Số liệu nhanh"></div>
+      <div class="ov-grid">
+        <section class="card ov">
+          <div class="ov-head"><h2>Tin nóng</h2><a href="#tin-tuc">Xem tất cả tin →</a></div>
+          <div id="ov-hot"><div class="skeleton"></div><div class="skeleton"></div></div>
+        </section>
+        <section class="card ov">
+          <div class="ov-head"><h2>Repo AI hot tuần này</h2><a href="#repo">Xem tất cả →</a></div>
+          <div id="ov-repos"><div class="skeleton"></div><div class="skeleton"></div></div>
+        </section>
+        <section class="card ov">
+          <div class="ov-head"><h2>Công nghệ đang hot</h2><a href="#cong-nghe">Xem giải thích →</a></div>
+          <div id="ov-tech"><div class="skeleton"></div><div class="skeleton"></div></div>
+        </section>
+        <section class="card ov">
+          <div class="ov-head"><h2>Mô hình AI mới ra mắt</h2><a href="#cong-nghe">Xem tất cả →</a></div>
+          <div id="ov-models"><div class="skeleton"></div><div class="skeleton"></div></div>
+        </section>
+        <section class="card ov wide">
+          <div class="ov-head"><h2>AI giỏi tới đâu rồi?</h2><a href="#ky-luc">Xem chi tiết →</a></div>
+          <div id="ov-bench" class="ov-bench"><div class="skeleton"></div></div>
+        </section>
+      </div>
+    </section>
 
-    <section class="block">
-      <div class="block-head">
+    <!-- Tin tức -->
+    <section class="page" data-page="tin-tuc" hidden>
+      <div class="layout">
+        <div class="col-main">
+          <section class="block first">
+            <div class="block-head">
+              <h2>Tin nóng</h2>
+              <p class="sub">Những sự kiện được nhiều báo cùng đưa tin trong vài ngày qua</p>
+            </div>
+            <div id="hot"><div class="skeleton"></div><div class="skeleton"></div></div>
+          </section>
+
+          <section class="block" id="river-block">
+            <div class="block-head">
+              <h2>Tất cả tin</h2>
+              <p class="sub">Tin mới nhất xếp theo thời gian. Tiêu đề được dịch tự động nên có thể chưa sát nghĩa — bấm “Bản gốc” ở trên cùng để xem tiếng Anh.</p>
+            </div>
+            <div class="filters">
+              <div class="chips" id="cats" role="group" aria-label="Loại nguồn"></div>
+              <div class="filter-row">
+                <input id="q" type="search" placeholder="Tìm tin: Gemini, robot, chip…" aria-label="Tìm kiếm tin">
+                <select id="range" aria-label="Khoảng thời gian"></select>
+                <select id="source" aria-label="Nguồn tin"><option value="">Mọi nguồn</option></select>
+              </div>
+              <div id="active-filter"></div>
+            </div>
+            <div id="river"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+            <button id="more" class="btn wide" type="button" hidden>Xem thêm</button>
+          </section>
+        </div>
+
+        <aside class="col-side">
+          <section class="card">
+            <h2>Đang được nói tới nhiều</h2>
+            <p class="sub">Số bài báo nhắc tới trong 7 ngày qua; ▲ là tăng so với tuần trước. Bấm vào một dòng để xem các tin đó.</p>
+            <div id="trends"><div class="skeleton"></div></div>
+          </section>
+          <section class="card">
+            <h2>Lấy tin từ đâu</h2>
+            <div id="sources"></div>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Repo hot -->
+    <section class="page" data-page="repo" hidden>
+      <div class="page-head">
+        <h2>Repo AI đang hot trên GitHub</h2>
+        <p class="sub">Dự án mã nguồn mở về AI được lập trình viên khắp thế giới gắn sao (★) nhiều nhất. Sao càng tăng nhanh, dự án càng được chú ý.</p>
+      </div>
+      <div class="seg" id="repo-mode" role="tablist" aria-label="Loại danh sách">
+        <button type="button" data-mode="trending" aria-pressed="true">Hot tuần này</button>
+        <button type="button" data-mode="rising" aria-pressed="false">Mới tạo, tăng nhanh (30 ngày)</button>
+      </div>
+      <p class="sub" id="repo-hint"></p>
+      <div id="repos" class="repo-list"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+    </section>
+
+    <!-- Công nghệ & công cụ -->
+    <section class="page" data-page="cong-nghe" hidden>
+      <div class="page-head">
+        <h2>Công nghệ AI đang được dùng nhiều</h2>
+        <p class="sub">Đếm số repo hot, bài báo tuần này và mô hình/ứng dụng trên Hugging Face nhắc tới từng công nghệ — kèm giải thích ngắn bằng tiếng Việt.</p>
+      </div>
+      <div id="tech" class="tech-grid"><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div></div>
+
+      <div class="three-col">
+        <section class="card">
+          <h2>Mô hình AI mới ra mắt</h2>
+          <p class="sub" id="models-sub">Theo <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a></p>
+          <div id="models"><div class="skeleton"></div></div>
+        </section>
+        <section class="card">
+          <h2>Mô hình mở đang hot</h2>
+          <p class="sub">Được tải và thích nhiều nhất tuần này trên <a href="https://huggingface.co/models?sort=trending" target="_blank" rel="noopener">Hugging Face</a> — tải về dùng miễn phí</p>
+          <div id="hf-models"><div class="skeleton"></div></div>
+        </section>
+        <section class="card">
+          <h2>Ứng dụng AI dùng thử miễn phí</h2>
+          <p class="sub">Đang hot trên <a href="https://huggingface.co/spaces" target="_blank" rel="noopener">Hugging Face Spaces</a> — bấm vào là dùng ngay trên trình duyệt</p>
+          <div id="hf-spaces"><div class="skeleton"></div></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Nghiên cứu -->
+    <section class="page" data-page="nghien-cuu" hidden>
+      <div class="page-head">
+        <h2>Nghiên cứu AI nổi bật</h2>
+        <p class="sub">Bài nghiên cứu mới được giới làm AI thích nhiều nhất · nguồn <a href="https://huggingface.co/papers" target="_blank" rel="noopener">Hugging Face Papers</a></p>
+      </div>
+      <div id="papers" class="paper-list"><div class="skeleton"></div><div class="skeleton"></div></div>
+    </section>
+
+    <!-- Kỷ lục -->
+    <section class="page" data-page="ky-luc" hidden>
+      <div class="page-head">
         <h2>AI giỏi tới đâu rồi?</h2>
         <p class="sub">Điểm cao nhất mà AI đạt được trên các bài kiểm tra khó nhất hiện nay (100% là làm đúng hết). Đường biểu đồ cho thấy kỷ lục tăng dần qua thời gian; rê chuột lên để xem từng mốc. Nguồn: <a href="https://epoch.ai/benchmarks" target="_blank" rel="noopener">Epoch AI</a></p>
       </div>
       <div class="bench-grid" id="bench"><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div></div>
     </section>
-
-    <div class="layout">
-      <div class="col-main">
-        <section class="block">
-          <div class="block-head">
-            <h2>Tin nóng</h2>
-            <p class="sub">Những sự kiện được nhiều báo cùng đưa tin trong vài ngày qua</p>
-          </div>
-          <div id="hot"><div class="skeleton"></div><div class="skeleton"></div></div>
-        </section>
-
-        <section class="block" id="river-block">
-          <div class="block-head">
-            <h2>Tất cả tin</h2>
-            <p class="sub">Tin mới nhất xếp theo thời gian. Tiêu đề được dịch tự động nên có thể chưa sát nghĩa — bấm “Xem bản gốc” ở trên cùng để xem tiếng Anh.</p>
-          </div>
-          <div class="filters">
-            <div class="chips" id="cats" role="group" aria-label="Loại nguồn"></div>
-            <div class="filter-row">
-              <input id="q" type="search" placeholder="Tìm tin: Gemini, robot, chip…" aria-label="Tìm kiếm tin">
-              <select id="range" aria-label="Khoảng thời gian"></select>
-              <select id="source" aria-label="Nguồn tin"><option value="">Mọi nguồn</option></select>
-            </div>
-            <div id="active-filter"></div>
-          </div>
-          <div id="river"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
-          <button id="more" class="btn wide" type="button" hidden>Xem thêm</button>
-        </section>
-      </div>
-
-      <aside class="col-side">
-        <section class="block card">
-          <h2>Đang được nói tới nhiều</h2>
-          <p class="sub">Số bài báo nhắc tới trong 7 ngày qua; ▲ là tăng so với tuần trước. Bấm vào một dòng để xem các tin đó.</p>
-          <div id="trends"><div class="skeleton"></div></div>
-        </section>
-
-        <section class="block card">
-          <h2>Mô hình AI mới ra mắt</h2>
-          <p class="sub" id="models-sub">Theo danh mục <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a></p>
-          <div id="models"><div class="skeleton"></div></div>
-        </section>
-
-        <section class="block card">
-          <h2>Nghiên cứu nổi bật</h2>
-          <p class="sub">Bài nghiên cứu mới được giới làm AI thích nhiều nhất · <a href="https://huggingface.co/papers" target="_blank" rel="noopener">Hugging Face</a></p>
-          <div id="papers"><div class="skeleton"></div></div>
-        </section>
-
-        <section class="block card">
-          <h2>Lấy tin từ đâu</h2>
-          <div id="sources"></div>
-        </section>
-      </aside>
-    </div>
   </main>
 
   <footer class="wrap foot muted">
-    Tin lấy từ các trang báo và công ty AI, mô hình mới từ OpenRouter, nghiên cứu từ Hugging Face, kỷ lục từ Epoch AI. Bản tiếng Việt do Google Dịch dịch tự động.
+    Tin từ các trang báo và công ty AI · repo từ GitHub · mô hình từ OpenRouter và Hugging Face · nghiên cứu từ Hugging Face Papers · kỷ lục từ Epoch AI. Bản tiếng Việt do Google Dịch dịch tự động.
   </footer>
 
   <div id="tip" class="tip" role="tooltip" hidden></div>
