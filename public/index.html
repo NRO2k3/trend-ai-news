@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Xu hướng AI</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%233b5bdb'/><path d='M8 22l5-12 4 8 3-5 4 9' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <div class="brand">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M8 22l5-12 4 8 3-5 4 9"/></svg>
+        <div>
+          <h1>Xu hướng AI</h1>
+          <p>Thế giới AI đang chạy tới đâu — tự cập nhật liên tục</p>
+        </div>
+      </div>
+      <div class="actions">
+        <span id="updated" class="muted"></span>
+        <button id="refresh" class="btn" type="button">Làm mới</button>
+        <button id="theme" class="btn icon" type="button" aria-label="Đổi giao diện sáng/tối">◐</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="pulse" id="pulse" aria-label="Tổng quan"></section>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Thế giới AI đang ở đâu</h2>
+        <p class="sub">Kỷ lục trên các bài kiểm tra khó nhất hiện nay · nguồn <a href="https://epoch.ai/benchmarks" target="_blank" rel="noopener">Epoch AI</a></p>
+      </div>
+      <div class="bench-grid" id="bench"><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div></div>
+    </section>
+
+    <div class="layout">
+      <div class="col-main">
+        <section class="block">
+          <div class="block-head">
+            <h2>Tin nóng</h2>
+            <p class="sub">Sự kiện đang được nhiều nguồn cùng đưa tin</p>
+          </div>
+          <div id="hot"><div class="skeleton"></div><div class="skeleton"></div></div>
+        </section>
+
+        <section class="block" id="river-block">
+          <div class="block-head">
+            <h2>Dòng tin</h2>
+            <p class="sub">Mới nhất từ phòng lab, báo chí, cộng đồng và báo Việt</p>
+          </div>
+          <div class="filters">
+            <div class="chips" id="cats" role="group" aria-label="Loại nguồn"></div>
+            <div class="filter-row">
+              <input id="q" type="search" placeholder="Tìm: Gemini, agent, robot…" aria-label="Tìm kiếm tin">
+              <select id="range" aria-label="Khoảng thời gian"></select>
+              <select id="source" aria-label="Nguồn tin"><option value="">Mọi nguồn</option></select>
+            </div>
+            <div id="active-filter"></div>
+          </div>
+          <div id="river"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+          <button id="more" class="btn wide" type="button" hidden>Xem thêm</button>
+        </section>
+      </div>
+
+      <aside class="col-side">
+        <section class="block card">
+          <h2>Được nhắc nhiều nhất</h2>
+          <p class="sub">Số tin trong 7 ngày qua · bấm để lọc</p>
+          <div id="trends"><div class="skeleton"></div></div>
+        </section>
+
+        <section class="block card">
+          <h2>Mô hình mới ra mắt</h2>
+          <p class="sub" id="models-sub">Theo danh mục <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a></p>
+          <div id="models"><div class="skeleton"></div></div>
+        </section>
+
+        <section class="block card">
+          <h2>Nghiên cứu nổi bật</h2>
+          <p class="sub">Paper được cộng đồng bình chọn nhiều · <a href="https://huggingface.co/papers" target="_blank" rel="noopener">Hugging Face</a></p>
+          <div id="papers"><div class="skeleton"></div></div>
+        </section>
+
+        <section class="block card">
+          <h2>Nguồn tin</h2>
+          <div id="sources"></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="wrap foot muted">
+    Dữ liệu lấy từ RSS của các nguồn, OpenRouter, Hugging Face và Epoch AI, được cập nhật tự động.
+  </footer>
+
+  <div id="tip" class="tip" role="tooltip" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

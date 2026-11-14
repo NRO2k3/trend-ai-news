@@ -1,0 +1,13 @@
+{
+  "name": "trend-ai-news",
+  "version": "1.0.0",
+  "description": "Trang tổng hợp tin tức và tiến bộ AI thế giới",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
