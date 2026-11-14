@@ -7,11 +7,19 @@ const nf1 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 const DAY = 86400e3;
 const REFRESH_MS = 15 * 60e3;
 
-const CATS = { all: 'Tất cả', lab: 'Phòng lab', media: 'Báo chí', research: 'Nghiên cứu', community: 'Cộng đồng', vn: 'Việt Nam' };
+const CATS = { all: 'Tất cả', lab: 'Công ty AI', media: 'Báo nước ngoài', research: 'Nghiên cứu', community: 'Blog & diễn đàn', vn: 'Báo Việt' };
 const RANGES = { 1: '24 giờ qua', 3: '3 ngày qua', 7: '7 ngày qua', 30: '30 ngày qua' };
+const PROVIDERS = {
+  google: 'Google', openai: 'OpenAI', anthropic: 'Anthropic', meta: 'Meta', 'meta-llama': 'Meta', mistralai: 'Mistral',
+  deepseek: 'DeepSeek', qwen: 'Alibaba (Qwen)', 'x-ai': 'xAI', moonshotai: 'Moonshot', baidu: 'Baidu', 'z-ai': 'Zhipu',
+  amazon: 'Amazon', microsoft: 'Microsoft', nvidia: 'NVIDIA', cohere: 'Cohere', minimax: 'MiniMax', liquid: 'Liquid AI',
+  thinkingmachines: 'Thinking Machines', inclusionai: 'Ant Group (inclusionAI)', openrouter: 'OpenRouter', bytedance: 'ByteDance',
+  'bytedance-seed': 'ByteDance', tencent: 'Tencent', ibm: 'IBM', perplexity: 'Perplexity', moondream: 'Moondream',
+};
+const EFFORT = { low: 'suy nghĩ ít', medium: 'suy nghĩ vừa', high: 'suy nghĩ nhiều', xhigh: 'suy nghĩ rất nhiều', max: 'suy nghĩ tối đa' };
 
-const state = { cat: 'all', days: 3, q: '', source: '', trend: null, limit: 40 };
-const data = { news: null, models: null, progress: null };
+const state = { cat: 'all', days: 3, q: '', source: '', trend: null, limit: 40, lang: 'vi' };
+const data = { news: null, models: null, papers: null, progress: null };
 
 // ---------- helpers ----------
 
@@ -33,11 +41,28 @@ function dayLabel(iso) {
   return d.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' });
 }
 
+// Vietnamese machine translation when available and wanted, otherwise the original.
+const tx = (obj, field) => (state.lang === 'vi' && obj[`${field}Vi`]) || obj[field] || '';
+
 const translateUrl = (url) => `https://translate.google.com/translate?sl=auto&tl=vi&u=${encodeURIComponent(url)}`;
 const thumb = (src, cls = 'thumb') =>
   src ? `<img class="${cls}" src="${esc(safeUrl(src))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
+const providerName = (id) => PROVIDERS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
 
-const prettyModel = (m) => m.replace(/_unknown$/, '').replace(/_([a-z]+)$/i, ' ($1)');
+// "claude-opus-4-7_max" → "Claude Opus 4.7"; the suffix is the reasoning effort.
+function modelName(raw) {
+  const words = [];
+  for (const part of raw.split('_')[0].split('-')) {
+    const prev = words.at(-1);
+    if (/^\d+$/.test(part) && /^\d+$/.test(prev ?? '')) {
+      words[words.length - 1] = `${prev}.${part}`;
+    } else {
+      words.push(/^(gpt|glm|llm)$/i.test(part) ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1));
+    }
+  }
+  return words.join(' ');
+}
+const effortOf = (raw) => EFFORT[raw.split('_')[1]] ?? '';
 
 function fmtScore(kind, v) {
   if (kind === 'minutes') return v >= 60 ? `${nf1.format(v / 60)} giờ` : `${nf1.format(v)} phút`;
@@ -67,13 +92,17 @@ function renderPulse() {
   if (news) {
     const day = news.items.filter((it) => Date.now() - Date.parse(it.date) < DAY).length;
     const ok = news.sources.filter((s) => s.ok).length;
-    tiles.push({ label: 'Tin mới trong 24 giờ', value: day, note: `từ ${ok}/${news.sources.length} nguồn đang hoạt động` });
+    tiles.push({ label: 'Tin mới trong 24 giờ qua', value: day, note: `tổng hợp từ ${ok} nguồn tin` });
     const top = news.trends.find((t) => t.kind === 'org');
-    if (top) tiles.push({ label: 'Được nhắc nhiều nhất tuần này', value: esc(top.name), note: `${top.now} tin trong 7 ngày`, small: true });
+    if (top) tiles.push({ label: 'Công ty được nói tới nhiều nhất', value: esc(top.name), note: `xuất hiện trong ${top.now} bài tuần này`, small: true });
   }
   if (models) {
     const lead = models.byProvider[0];
-    tiles.push({ label: 'Mô hình mới trong 30 ngày', value: models.last30, note: lead ? `nhiều nhất: ${esc(lead.provider)} (${lead.count})` : '' });
+    tiles.push({
+      label: 'Mô hình AI mới ra mắt (30 ngày)',
+      value: models.last30,
+      note: lead ? `ra nhiều nhất: ${esc(providerName(lead.provider))} (${lead.count})` : '',
+    });
   }
   if (progress) {
     const latest = progress.benchmarks
@@ -82,8 +111,8 @@ function renderPulse() {
     if (latest) {
       tiles.push({
         label: 'Kỷ lục mới nhất',
-        value: `${esc(prettyModel(latest.r.model))}`,
-        note: `${esc(latest.b.name)}: ${fmtScore(latest.b.kind, latest.r.score)} · ${fmtDate(latest.r.date)}`,
+        value: esc(modelName(latest.r.model)),
+        note: `${esc(latest.b.title)}: ${fmtScore(latest.b.kind, latest.r.score)}`,
         small: true,
       });
     }
@@ -121,7 +150,7 @@ function sparkline(b, i) {
   const dots = g.pts
     .map((p, j) => `<circle class="pt" data-j="${j}" cx="${p.x}" cy="${p.y}" r="${j === g.pts.length - 1 ? 4 : 2.5}"/>`)
     .join('');
-  const label = `Biểu đồ kỷ lục ${b.name} theo thời gian, từ ${fmtScore(b.kind, g.pts[0].v)} lên ${fmtScore(b.kind, g.pts.at(-1).v)}`;
+  const label = `Kỷ lục ${b.title} tăng từ ${fmtScore(b.kind, g.pts[0].v)} lên ${fmtScore(b.kind, g.pts.at(-1).v)}`;
   return `<svg class="spark" data-i="${i}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">
     ${b.kind === 'pct' ? `<line class="grid" x1="0" x2="${W}" y1="${g.top}" y2="${g.top}"/>` : ''}
     <line class="base" x1="0" x2="${W}" y1="${g.base}" y2="${g.base}"/>
@@ -137,23 +166,29 @@ function renderProgress(progress) {
       const L = b.leader;
       let delta = '';
       if (b.yearAgo) {
-        delta =
+        const change =
           b.kind === 'minutes'
-            ? `<b>×${nf1.format(L.score / b.yearAgo.score)}</b> so với 12 tháng trước (${fmtScore(b.kind, b.yearAgo.score)})`
-            : `<b>+${nf1.format((L.score - b.yearAgo.score) * 100)} điểm</b> so với 12 tháng trước (${fmtScore(b.kind, b.yearAgo.score)})`;
+            ? `<b>gấp ${nf1.format(L.score / b.yearAgo.score)} lần</b>`
+            : `<b>tăng ${nf1.format((L.score - b.yearAgo.score) * 100)} điểm</b>`;
+        delta = `1 năm trước chỉ ${fmtScore(b.kind, b.yearAgo.score)} → ${change}`;
       }
       const rows = b.top
-        .map((t) => `<tr><td>${esc(prettyModel(t.model))}<br><small>${esc(t.org)} · ${fmtDate(t.date)}</small></td><td>${fmtScore(b.kind, t.score)}</td></tr>`)
+        .map(
+          (t) =>
+            `<tr><td>${esc(modelName(t.model))} <small>(${esc(t.org)})</small>${effortOf(t.model) ? `<br><small>${effortOf(t.model)} · ${fmtDate(t.date)}</small>` : `<br><small>${fmtDate(t.date)}</small>`}</td><td>${fmtScore(b.kind, t.score)}</td></tr>`,
+        )
         .join('');
       return `<article class="bench">
-        <h3>${esc(b.name)}</h3>
+        <h3>${esc(b.title)}</h3>
+        <div class="orig">Bài kiểm tra: ${esc(b.name)}</div>
         <div class="desc">${esc(b.desc)}</div>
         <div class="big">${fmtScore(b.kind, L.score)}</div>
-        <div class="who" title="${esc(prettyModel(L.model))}">${esc(prettyModel(L.model))} · ${esc(L.org)}</div>
+        <div class="caption">${esc(b.caption)}</div>
+        <div class="who">Dẫn đầu: <strong>${esc(modelName(L.model))}</strong> của ${esc(L.org)}</div>
         ${delta ? `<div class="delta">${delta}</div>` : ''}
         ${sparkline(b, i)}
-        <div class="axis"><span>${new Date(b.record[0].date).getFullYear()}</span><span>${b.kind === 'minutes' ? 'thang log · ' : ''}nay</span></div>
-        <details><summary>Top 5 trong ${b.evaluated} mô hình đã đo</summary><table>${rows}</table></details>
+        <div class="axis"><span>${new Date(b.record[0].date).getFullYear()}</span><span>hiện nay</span></div>
+        <details><summary>Xem 5 mô hình đứng đầu (trong ${b.evaluated} mô hình đã thử)</summary><table>${rows}</table></details>
       </article>`;
     })
     .join('');
@@ -181,7 +216,7 @@ function initSparkHover() {
     const p = g.pts[best];
     const dot = svg.querySelector(`.pt[data-j="${best}"]`);
     if (dot !== lastDot) { lastDot?.classList.remove('on'); dot.classList.add('on'); lastDot = dot; }
-    tip.innerHTML = `<b>${fmtScore(b.kind, p.v)}</b> — ${esc(prettyModel(p.r.model))}<br>${esc(p.r.org)} · ${fmtDate(p.r.date)}`;
+    tip.innerHTML = `Kỷ lục <b>${fmtScore(b.kind, p.v)}</b><br>${esc(modelName(p.r.model))} (${esc(p.r.org)})<br>${fmtDate(p.r.date)}`;
     tip.hidden = false;
     const tx = rect.left + (p.x / SPARK.W) * rect.width;
     const ty = rect.top + (p.y / SPARK.H) * rect.height;
@@ -193,15 +228,19 @@ function initSparkHover() {
 
 // ---------- news ----------
 
-function metaRow(it) {
-  return `<div class="meta"><span class="dot cat-${it.cat}" title="${CATS[it.cat]}"></span><span class="src">${esc(it.sourceName)}</span><span>·</span><time datetime="${it.date}" title="${new Date(it.date).toLocaleString('vi-VN')}">${ago(it.date)}</time>${
-    it.lang !== 'vi' ? `<span>·</span><a class="tr" href="${translateUrl(it.url)}" target="_blank" rel="noopener noreferrer">Dịch</a>` : ''
-  }</div>`;
+function readLink(url, lang) {
+  if (lang === 'vi') return '';
+  return `<span>·</span><a class="tr" href="${translateUrl(url)}" target="_blank" rel="noopener noreferrer" title="Mở bài gốc đã dịch sang tiếng Việt bằng Google Dịch">Đọc bài bằng tiếng Việt</a>`;
 }
 
-function renderHot(news) {
+function metaRow(it, extra = '') {
+  return `<div class="meta"><span class="dot cat-${it.cat}" title="${CATS[it.cat]}"></span><span class="src">${esc(it.sourceName)}</span><span>·</span><time datetime="${it.date}" title="${new Date(it.date).toLocaleString('vi-VN')}">${ago(it.date)}</time>${extra}${readLink(it.url, it.lang)}</div>`;
+}
+
+function renderHot() {
+  const news = data.news;
   if (!news.hot.length) {
-    $('#hot').innerHTML = '<p class="empty">Chưa có sự kiện nào được nhiều nguồn cùng đưa trong vài ngày qua.</p>';
+    $('#hot').innerHTML = '<p class="empty">Chưa có sự kiện nào được nhiều báo cùng đưa trong vài ngày qua.</p>';
     return;
   }
   $('#hot').innerHTML = news.hot
@@ -209,14 +248,15 @@ function renderHot(news) {
       const it = c.lead;
       const related = c.related
         .slice(0, 6)
-        .map((r) => `<li><b>${esc(r.sourceName)}:</b> <a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a></li>`)
+        .map((r) => `<li><b>${esc(r.sourceName)}:</b> <a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">${esc(tx(r, 'title'))}</a></li>`)
         .join('');
+      const summary = tx(it, 'summary');
       return `<article class="hot">
         <div>
-          ${metaRow(it).replace('</div>', `<span class="count">${c.sourceCount} nguồn</span></div>`)}
-          <a class="title" href="${esc(safeUrl(it.url))}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
-          ${it.summary ? `<p class="sum">${esc(it.summary)}</p>` : ''}
-          ${related ? `<ul class="related">${related}</ul>` : ''}
+          ${metaRow(it, `<span class="count">${c.sourceCount} nguồn cùng đưa tin</span>`)}
+          <a class="title" href="${esc(safeUrl(it.url))}" target="_blank" rel="noopener noreferrer">${esc(tx(it, 'title'))}</a>
+          ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
+          ${related ? `<div class="related-label">Các nguồn khác viết:</div><ul class="related">${related}</ul>` : ''}
         </div>
         ${thumb(it.image)}
       </article>`;
@@ -235,7 +275,7 @@ function filteredItems() {
       (!state.source || it.source === state.source) &&
       Date.parse(it.date) >= cutoff &&
       (!re || re.test(`${it.title} ${it.summary}`)) &&
-      (!q || `${it.title} ${it.summary} ${it.sourceName}`.toLowerCase().includes(q)),
+      (!q || `${it.title} ${it.summary} ${it.titleVi ?? ''} ${it.summaryVi ?? ''} ${it.sourceName}`.toLowerCase().includes(q)),
   );
 }
 
@@ -257,13 +297,14 @@ function renderChips() {
 }
 
 function renderRiver() {
+  if (!data.news) return;
   renderChips();
   const list = filteredItems();
   $('#active-filter').innerHTML = state.trend
-    ? `Đang lọc theo: <strong>${esc(state.trend.name)}</strong> <button type="button" id="clear-trend">Bỏ lọc ✕</button>`
+    ? `Đang xem tin về: <strong>${esc(state.trend.name)}</strong> <button type="button" id="clear-trend">Bỏ lọc ✕</button>`
     : '';
   if (!list.length) {
-    $('#river').innerHTML = '<p class="empty">Không có tin nào khớp bộ lọc. Thử nới khoảng thời gian hoặc bỏ bớt điều kiện.</p>';
+    $('#river').innerHTML = '<p class="empty">Không có tin nào khớp. Thử chọn khoảng thời gian dài hơn hoặc bỏ bớt điều kiện lọc.</p>';
     $('#more').hidden = true;
     return;
   }
@@ -274,23 +315,25 @@ function renderRiver() {
       const day = dayLabel(it.date);
       const head = day !== lastDay ? `<h3 class="day">${day}</h3>` : '';
       lastDay = day;
+      const summary = tx(it, 'summary');
       return `${head}<article class="item">
         <div>
           ${metaRow(it)}
-          <a class="title" href="${esc(safeUrl(it.url))}" target="_blank" rel="noopener noreferrer">${esc(it.title)}</a>
-          ${it.summary ? `<p class="sum">${esc(it.summary)}</p>` : ''}
+          <a class="title" href="${esc(safeUrl(it.url))}" target="_blank" rel="noopener noreferrer">${esc(tx(it, 'title'))}</a>
+          ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
         </div>
         ${thumb(it.image)}
       </article>`;
     })
     .join('');
   $('#more').hidden = list.length <= state.limit;
-  $('#more').textContent = `Xem thêm (${list.length - state.limit} tin)`;
+  $('#more').textContent = `Xem thêm (còn ${list.length - state.limit} tin)`;
 }
 
-function renderTrends(news) {
+function renderTrends() {
+  const news = data.news;
   const groups = [
-    ['org', 'Công ty & phòng lab'],
+    ['org', 'Công ty'],
     ['topic', 'Chủ đề'],
   ];
   const max = Math.max(1, ...news.trends.map((t) => t.now));
@@ -301,8 +344,8 @@ function renderTrends(news) {
         .slice(0, 8)
         .map((t) => {
           const diff = t.now - t.before;
-          const delta = diff > 0 ? `<small class="up">▲${diff}</small>` : diff < 0 ? `<small class="down">▼${-diff}</small>` : '<small>–</small>';
-          return `<button class="trend" type="button" data-trend="${esc(t.name)}" title="${t.now} tin tuần này, ${t.before} tin tuần trước">
+          const delta = diff > 0 ? `<small class="up">▲${diff}</small>` : diff < 0 ? `<small class="down">▼${-diff}</small>` : '<small>=</small>';
+          return `<button class="trend" type="button" data-trend="${esc(t.name)}" title="${t.now} bài tuần này, ${t.before} bài tuần trước. Bấm để xem các tin này.">
             <span class="name">${esc(t.name)}</span>
             <span><span class="bar" style="display:block;width:${(t.now / max) * 100}%"></span></span>
             <span class="val">${t.now} ${delta}</span>
@@ -314,7 +357,8 @@ function renderTrends(news) {
     .join('');
 }
 
-function renderSources(news) {
+function renderSources() {
+  const news = data.news;
   const sel = $('#source');
   const current = sel.value;
   sel.innerHTML =
@@ -324,7 +368,7 @@ function renderSources(news) {
   $('#sources').innerHTML = `<ul class="src-list">${news.sources
     .map(
       (s) =>
-        `<li><span class="dot cat-${s.cat}"></span>${esc(s.name)}<span class="n ${s.ok ? '' : 'bad'}" title="${esc(s.error ?? '')}">${s.ok ? s.count : 'lỗi'}</span></li>`,
+        `<li><span class="dot cat-${s.cat}" title="${CATS[s.cat]}"></span>${esc(s.name)}<span class="n ${s.ok ? '' : 'bad'}" title="${esc(s.error ?? '')}">${s.ok ? `${s.count} tin` : 'lỗi'}</span></li>`,
     )
     .join('')}</ul>`;
 }
@@ -339,9 +383,9 @@ function renderUpdated() {
 function renderNews(news) {
   data.news = news;
   renderUpdated();
-  renderHot(news);
-  renderTrends(news);
-  renderSources(news);
+  renderHot();
+  renderTrends();
+  renderSources();
   renderRiver();
   renderPulse();
 }
@@ -352,39 +396,49 @@ let showAllModels = false;
 
 function renderModels(models) {
   data.models = models;
-  $('#models-sub').innerHTML = `${models.last30} mô hình mới trong 30 ngày · theo <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a>`;
+  $('#models-sub').innerHTML = `${models.last30} mô hình mới trong 30 ngày qua · theo <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a>`;
   const list = showAllModels ? models.models : models.models.slice(0, 8);
-  const price = (m) => (m.free ? 'Miễn phí' : m.priceIn != null ? `$${nf1.format(m.priceIn)} / $${nf1.format(m.priceOut ?? 0)} mỗi 1M token` : '');
-  const ctx = (n) => (n >= 1e6 ? `${nf1.format(n / 1e6)}M ctx` : `${Math.round(n / 1000)}K ctx`);
   $('#models').innerHTML =
-    `<div class="providers">${models.byProvider
-      .slice(0, 8)
-      .map((p) => `<span class="tag">${esc(p.provider)} ${p.count}</span>`)
+    `<div class="providers"><span class="muted">Hãng ra nhiều nhất:</span>${models.byProvider
+      .slice(0, 6)
+      .map((p) => `<span class="tag">${esc(providerName(p.provider))} ${p.count}</span>`)
       .join('')}</div>` +
     list
-      .map(
-        (m) => `<div class="mini">
-          <a class="name" href="${esc(safeUrl(m.url))}" target="_blank" rel="noopener noreferrer">${esc(m.name)}</a>
-          <div class="meta"><span>${ago(m.created)}</span>${m.context ? `<span>·</span><span>${ctx(m.context)}</span>` : ''}${price(m) ? `<span>·</span><span>${price(m)}</span>` : ''}</div>
-          ${m.description ? `<p>${esc(m.description)}</p>` : ''}
-        </div>`,
-      )
+      .map((m) => {
+        const desc = tx(m, 'description');
+        return `<div class="mini">
+          <a class="name" href="${esc(safeUrl(m.url))}" target="_blank" rel="noopener noreferrer">${esc(m.name.replace(/^[^:]+:\s*/, ''))}</a>
+          <div class="meta"><span class="src">${esc(providerName(m.provider))}</span><span>·</span><span>ra mắt ${ago(m.created)}</span>${m.free ? '<span>·</span><span class="tag">Miễn phí</span>' : ''}</div>
+          ${desc ? `<p>${esc(desc)}</p>` : ''}
+        </div>`;
+      })
       .join('') +
-    (models.models.length > 8 ? `<button class="linkbtn" type="button" id="toggle-models">${showAllModels ? 'Thu gọn' : `Xem tất cả ${models.models.length} mô hình (60 ngày)`}</button>` : '');
+    (models.models.length > 8 ? `<button class="linkbtn" type="button" id="toggle-models">${showAllModels ? 'Thu gọn' : `Xem tất cả ${models.models.length} mô hình (60 ngày qua)`}</button>` : '');
   renderPulse();
 }
 
 function renderPapers(res) {
+  data.papers = res;
   $('#papers').innerHTML = res.papers
     .slice(0, 8)
-    .map(
-      (p) => `<div class="mini">
-        <a class="name" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${esc(p.title)}</a>
-        <div class="meta"><span class="votes">▲ ${p.upvotes}</span>${p.org ? `<span>·</span><span>${esc(p.org)}</span>` : ''}<span>·</span><a class="tr" href="${translateUrl(p.url)}" target="_blank" rel="noopener noreferrer">Dịch</a></div>
-        ${p.summary ? `<p>${esc(p.summary)}</p>` : ''}
-      </div>`,
-    )
+    .map((p) => {
+      const summary = tx(p, 'summary');
+      return `<div class="mini">
+        <a class="name" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${esc(tx(p, 'title'))}</a>
+        <div class="meta"><span class="votes">▲ ${p.upvotes} lượt thích</span>${p.org ? `<span>·</span><span>${esc(p.org)}</span>` : ''}</div>
+        ${summary ? `<p>${esc(summary)}</p>` : ''}
+      </div>`;
+    })
     .join('');
+}
+
+// Re-render every text that has a Vietnamese version.
+function renderLanguage() {
+  $('#lang').textContent = state.lang === 'vi' ? 'Xem bản gốc' : 'Xem tiếng Việt';
+  $('#lang').title = state.lang === 'vi' ? 'Đang hiện bản dịch tiếng Việt. Bấm để xem tiêu đề gốc tiếng Anh.' : 'Đang hiện bản gốc. Bấm để xem bản dịch tiếng Việt.';
+  if (data.news) { renderHot(); renderRiver(); }
+  if (data.models) renderModels(data.models);
+  if (data.papers) renderPapers(data.papers);
 }
 
 // ---------- loading ----------
@@ -404,6 +458,10 @@ async function loadAll(force = false) {
 }
 
 // ---------- events ----------
+
+function remember(key, value) {
+  try { localStorage.setItem(key, value); } catch {}
+}
 
 function initControls() {
   $('#range').innerHTML = Object.entries(RANGES).map(([d, l]) => `<option value="${d}">${l}</option>`).join('');
@@ -442,20 +500,28 @@ function initControls() {
   });
   $('#refresh').addEventListener('click', () => loadAll(true));
 
+  $('#lang').addEventListener('click', () => {
+    state.lang = state.lang === 'vi' ? 'en' : 'vi';
+    remember('lang', state.lang);
+    renderLanguage();
+  });
+
   $('#theme').addEventListener('click', () => {
     const root = document.documentElement;
     const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
     root.dataset.theme = dark ? 'light' : 'dark';
-    try { localStorage.setItem('theme', root.dataset.theme); } catch {}
+    remember('theme', root.dataset.theme);
   });
 }
 
 try {
-  const saved = localStorage.getItem('theme');
-  if (saved) document.documentElement.dataset.theme = saved;
+  const theme = localStorage.getItem('theme');
+  if (theme) document.documentElement.dataset.theme = theme;
+  if (localStorage.getItem('lang') === 'en') state.lang = 'en';
 } catch {}
 
 initControls();
+renderLanguage();
 initSparkHover();
 loadAll();
 setInterval(() => loadAll(), REFRESH_MS);

@@ -141,9 +141,12 @@ h2 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
 .bench-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .bench { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 12px; box-shadow: var(--shadow); display: flex; flex-direction: column; min-width: 0; }
 .bench h3 { font-size: 0.95rem; font-weight: 600; }
-.bench .desc { font-size: 0.78rem; color: var(--muted); margin: 2px 0 8px; min-height: 2.4em; }
+.bench .orig { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+.bench .desc { font-size: 0.8rem; color: var(--ink-2); margin: 6px 0 10px; min-height: 3.6em; }
+.bench .caption { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
 .bench .big { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
-.bench .who { font-size: 0.82rem; color: var(--ink-2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bench .who { font-size: 0.84rem; color: var(--ink-2); margin-top: 8px; }
+.bench .who strong { color: var(--ink); font-weight: 600; }
 .bench .delta { font-size: 0.78rem; color: var(--ink-2); margin-top: 6px; }
 .bench .delta b { color: var(--up); font-weight: 600; }
 .spark { width: 100%; height: auto; margin-top: 10px; display: block; overflow: visible; cursor: crosshair; }
@@ -168,7 +171,8 @@ h2 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
 .hot .sum { margin: 0; color: var(--ink-2); font-size: 0.9rem; }
 .hot .thumb { width: 132px; height: 96px; }
 .hot .count { display: inline-block; font-size: 0.75rem; font-weight: 600; color: var(--accent); background: var(--accent-soft); padding: 1px 8px; border-radius: 999px; margin-left: 4px; }
-.related { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px dashed var(--line); font-size: 0.85rem; }
+.related-label { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 0.75rem; color: var(--muted); }
+.related { list-style: none; margin: 4px 0 0; padding: 0; font-size: 0.85rem; }
 .related li { margin: 3px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .related b { font-weight: 600; color: var(--ink-2); }
 .related a { text-decoration: none; color: var(--ink-2); }
@@ -233,7 +237,7 @@ h2 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
 .mini p { margin: 3px 0 0; font-size: 0.8rem; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .tag { font-size: 0.7rem; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; color: var(--ink-2); }
 .votes { font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; }
-.providers { display: flex; flex-wrap: wrap; gap: 4px; margin: -4px 0 10px; }
+.providers { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: -4px 0 10px; font-size: 0.78rem; }
 .linkbtn { font: inherit; font-size: 0.82rem; background: none; border: 0; color: var(--accent); cursor: pointer; padding: 6px 0 0; }
 
 /* Sources */
@@ -262,6 +266,7 @@ h2 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
 @media (max-width: 560px) {
   body { font-size: 14px; }
   .brand p, #updated { display: none; }
+  .actions .btn { padding: 6px 10px; }
   .hot { grid-template-columns: minmax(0, 1fr); }
   .hot .thumb { display: none; }
   .item .thumb { width: 64px; height: 52px; }
