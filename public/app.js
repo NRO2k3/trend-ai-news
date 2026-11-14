@@ -87,7 +87,9 @@ function fmtDate(iso) {
 }
 
 async function api(name, force) {
-  const res = await fetch(`data/${name}.json` + (force ? `?refresh=${Date.now()}` : ''));
+  // Revalidate every time: the data is rebuilt every 30 minutes under the same URL,
+  // and browsers otherwise keep serving a copy that can be hours old.
+  const res = await fetch(`data/${name}.json` + (force ? `?refresh=${Date.now()}` : ''), { cache: 'no-cache' });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
   return body;
