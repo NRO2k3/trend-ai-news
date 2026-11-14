@@ -56,10 +56,22 @@ const tx = (obj, field) => (state.lang === 'vi' && obj[`${field}Vi`]) || obj[fie
 
 const link = (url, text, cls = '') =>
   `<a${cls ? ` class="${cls}"` : ''} href="${esc(safeUrl(url))}" target="_blank" rel="noopener noreferrer">${text}</a>`;
-const translateUrl = (url) => `https://translate.google.com/translate?sl=auto&tl=vi&u=${encodeURIComponent(url)}`;
 const thumb = (src, cls = 'thumb') =>
   src ? `<img class="${cls}" src="${esc(safeUrl(src))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : '';
 const avatar = (owner) => `<img class="avatar" src="https://github.com/${encodeURIComponent(owner)}.png?size=64" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`;
+const icon = (id) => `<svg class="i"><use href="#i-${id}"/></svg>`;
+// Lowercase without Vietnamese accents, so "bao mat" finds "bảo mật".
+const fold = (s = '') => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/gi, 'd').toLowerCase();
+const LANG_COLORS = {
+  Python: '#3572A5', TypeScript: '#3178c6', JavaScript: '#f1e05a', Rust: '#dea584', Go: '#00ADD8', 'Jupyter Notebook': '#DA5B0B',
+  Shell: '#89e051', HTML: '#e34c26', 'C++': '#f34b7d', C: '#555555', Java: '#b07219', Swift: '#F05138', Kotlin: '#A97BFF', Ruby: '#701516',
+  PHP: '#4F5D95', Dart: '#00B4AB', Vue: '#41b883', Svelte: '#ff3e00', MDX: '#fcb32c', Zig: '#ec915c',
+};
+
+function setCount(name, n) {
+  for (const el of $$(`[data-count="${name}"]`)) el.textContent = n ? String(n) : '';
+}
+
 const providerName = (id) => PROVIDERS[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
 
 // "claude-opus-4-7_max" → "Claude Opus 4.7"; the suffix is the reasoning effort.
@@ -113,12 +125,19 @@ function setHTML(sel, html) {
 function route() {
   const tab = TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'tong-quan';
   for (const page of $$('.page')) page.hidden = page.dataset.page !== tab;
-  for (const a of $$('.tabs a')) {
+  for (const a of $$('a[data-tab]')) {
     if (a.dataset.tab === tab) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
-  $(`.tabs a[data-tab="${tab}"]`)?.scrollIntoView({ block: 'nearest', inline: 'center' });
-  document.title = tab === 'tong-quan' ? 'Xu hướng AI' : `${$(`.tabs a[data-tab="${tab}"]`)?.textContent} · Xu hướng AI`;
+  // On phones "Thêm" stands for the sections that only live in its sheet.
+  const more = $('#more-btn');
+  if (more) {
+    if (['cong-nghe', 'nghien-cuu', 'ky-luc'].includes(tab)) more.setAttribute('aria-current', 'page');
+    else more.removeAttribute('aria-current');
+  }
+  closeSheet();
+  const label = $(`.nav a[data-tab="${tab}"] span`)?.textContent;
+  document.title = tab === 'tong-quan' || !label ? 'Xu hướng AI' : `${label} · Xu hướng AI`;
 }
 
 function goTab(tab) {
@@ -129,8 +148,9 @@ function goTab(tab) {
 
 // Sticky header + tabs height, so the news filters stick right below them.
 function measureSticky() {
-  const h = $('#sticky')?.offsetHeight;
-  if (h) document.documentElement.style.setProperty('--stick', `${h}px`);
+  const bar = $('.topbar');
+  const h = bar && getComputedStyle(bar).display !== 'none' ? bar.offsetHeight : 0;
+  document.documentElement.style.setProperty('--stick', `${h}px`);
 }
 
 // ---------- overview ----------
@@ -141,39 +161,28 @@ function renderPulse() {
   if (news) {
     const day = news.items.filter((it) => Date.now() - Date.parse(it.date) < DAY).length;
     const ok = news.sources.filter((s) => s.ok).length;
-    tiles.push({ tab: 'tin-tuc', label: 'Tin mới trong 24 giờ qua', value: day, note: `tổng hợp từ ${ok} nguồn tin` });
+    tiles.push({ tab: 'tin-tuc', icon: 'news', label: 'Tin mới 24 giờ qua', value: day, note: `từ ${ok} nguồn tin` });
   }
   if (repos?.trending.length) {
     const top = repos.trending[0];
-    tiles.push({ tab: 'repo', label: 'Repo AI hot nhất tuần', value: esc(top.name.split('/')[1]), note: `+${nf0.format(top.week || top.today)} sao trong tuần`, small: true });
+    tiles.push({ tab: 'repo', icon: 'repo', label: 'Repo hot nhất tuần', value: `<span class="mono">${esc(top.name.split('/')[1])}</span>`, note: `+${nf0.format(top.week || top.today)} sao tuần này`, small: true });
   }
   if (models) {
     const lead = models.byProvider[0];
-    tiles.push({
-      tab: 'cong-nghe',
-      label: 'Mô hình AI mới (30 ngày)',
-      value: models.last30,
-      note: lead ? `ra nhiều nhất: ${esc(providerName(lead.provider))} (${lead.count})` : '',
-    });
+    tiles.push({ tab: 'cong-nghe', icon: 'cpu', label: 'Mô hình mới 30 ngày', value: models.last30, note: lead ? `nhiều nhất: ${esc(providerName(lead.provider))} (${lead.count})` : '' });
   }
   if (progress) {
     const latest = progress.benchmarks
       .map((b) => ({ b, r: b.record.at(-1) }))
       .sort((x, y) => Date.parse(y.r.date) - Date.parse(x.r.date))[0];
     if (latest) {
-      tiles.push({
-        tab: 'ky-luc',
-        label: 'Kỷ lục AI mới nhất',
-        value: esc(modelName(latest.r.model)),
-        note: `${esc(latest.b.title)}: ${fmtScore(latest.b.kind, latest.r.score)}`,
-        small: true,
-      });
+      tiles.push({ tab: 'ky-luc', icon: 'trophy', label: 'Kỷ lục mới nhất', value: esc(modelName(latest.r.model)), note: `${esc(latest.b.title)}: ${fmtScore(latest.b.kind, latest.r.score)}`, small: true });
     }
   }
   setHTML(
     '#pulse',
     tiles
-      .map((t) => `<a class="tile" href="#${t.tab}"><div class="label">${t.label}</div><div class="value${t.small ? ' small' : ''}">${t.value}</div><div class="note">${t.note}</div></a>`)
+      .map((t) => `<a class="kpi" href="#${t.tab}"><span class="kpi-label">${icon(t.icon)}${t.label}</span><span class="kpi-value${t.small ? ' small' : ''}">${t.value}</span><span class="kpi-note">${t.note}</span></a>`)
       .join(''),
   );
 }
@@ -184,12 +193,18 @@ function renderOverviewHot() {
     '#ov-hot',
     hot.length
       ? hot
-          .map(
-            (c) => `<div class="ov-row">
-              ${link(c.lead.url, esc(tx(c.lead, 'title')), 'ov-title')}
-              <div class="meta"><span class="count">${c.sourceCount} nguồn</span><span>${ago(c.latest)}</span></div>
-            </div>`,
-          )
+          .map((c, i) => {
+            const it = c.lead;
+            const sum = i === 0 ? tx(it, 'summary') : '';
+            return `<a class="feature" href="${esc(safeUrl(it.url))}" target="_blank" rel="noopener noreferrer">
+              <div>
+                <div class="feature-title">${esc(tx(it, 'title'))}</div>
+                ${sum ? `<p class="feature-sum">${esc(sum)}</p>` : ''}
+                <div class="meta"><span class="src">${esc(it.sourceName)}</span><span class="badge">${c.sourceCount} nguồn</span><span>${ago(c.latest)}</span></div>
+              </div>
+              ${thumb(it.image)}
+            </a>`;
+          })
           .join('')
       : '<p class="empty">Chưa có tin nóng.</p>',
   );
@@ -199,30 +214,30 @@ function renderOverviewRepos() {
   setHTML(
     '#ov-repos',
     data.repos.trending
-      .slice(0, 5)
-      .map(
-        (r) => `<div class="ov-row with-avatar">
-          ${avatar(r.name.split('/')[0])}
-          <div>
-            ${link(r.url, `${esc(r.name.split('/')[0])}/<b>${esc(r.name.split('/')[1])}</b>`, 'ov-title')}
-            <div class="ov-desc">${esc(tx(r, 'description'))}</div>
-            <div class="meta"><span class="up">▲ ${nf0.format(r.week || r.today)} sao tuần này</span><span>·</span><span>★ ${big(r.stars)}</span></div>
-          </div>
-        </div>`,
-      )
+      .slice(0, 6)
+      .map((r) => {
+        const [owner, name] = r.name.split('/');
+        return `<a class="row" href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">
+          ${avatar(owner)}
+          <div class="min0"><div class="row-title mono">${esc(owner)}/<b>${esc(name)}</b></div><div class="row-sub">${esc(tx(r, 'description'))}</div></div>
+          <span class="pill-up">${icon('star')}+${nf0.format(r.week || r.today)}</span>
+        </a>`;
+      })
       .join(''),
   );
 }
 
 function renderOverviewTech() {
-  const list = data.tech.techs.slice(0, 6);
+  const list = data.tech.techs.slice(0, 7);
+  const max = Math.max(1, ...list.map((t) => t.total));
   setHTML(
     '#ov-tech',
     list
       .map(
-        (t) => `<a class="ov-row tech-mini" href="#cong-nghe">
-          <div class="tech-mini-head"><b>${esc(t.name)}</b><span class="muted">${t.total} lượt nhắc</span></div>
-          <div class="ov-desc">${esc(t.what)}</div>
+        (t) => `<a class="bar-row" href="#cong-nghe" title="${esc(t.what)}">
+          <span class="name">${esc(t.name)}</span>
+          <span class="bar-track"><span class="bar" style="display:block;width:${(t.total / max) * 100}%"></span></span>
+          <span class="val">${t.total}</span>
         </a>`,
       )
       .join(''),
@@ -235,10 +250,10 @@ function renderOverviewModels() {
     data.models.models
       .slice(0, 5)
       .map(
-        (m) => `<div class="ov-row">
-          ${link(m.url, esc(m.name.replace(/^[^:]+:\s*/, '')), 'ov-title')}
-          <div class="meta"><span class="src">${esc(providerName(m.provider))}</span><span>·</span><span>${ago(m.created)}</span>${m.free ? '<span class="tag">Miễn phí</span>' : ''}</div>
-        </div>`,
+        (m) => `<a class="row no-lead" href="${esc(safeUrl(m.url))}" target="_blank" rel="noopener noreferrer">
+          <div class="min0"><div class="row-title">${esc(m.name.replace(/^[^:]+:\s*/, ''))}</div><div class="row-sub">${esc(providerName(m.provider))} · ${ago(m.created)}</div></div>
+          ${m.free ? '<span class="tag">Miễn phí</span>' : ''}
+        </a>`,
       )
       .join(''),
   );
@@ -252,7 +267,7 @@ function renderOverviewBench() {
         (b) => `<a class="ov-stat" href="#ky-luc">
           <div class="label">${esc(b.title)}</div>
           <div class="value">${fmtScore(b.kind, b.leader.score)}</div>
-          <div class="note">${esc(b.caption)}</div>
+          <div class="who">${esc(modelName(b.leader.model))}</div>
         </a>`,
       )
       .join(''),
@@ -374,13 +389,14 @@ function initSparkHover() {
 
 // ---------- news ----------
 
-function readLink(url, lang) {
-  if (lang === 'vi') return '';
-  return `<span>·</span><a class="tr" href="${translateUrl(url)}" target="_blank" rel="noopener noreferrer" title="Mở bài gốc đã dịch sang tiếng Việt bằng Google Dịch">Đọc bài bằng tiếng Việt</a>`;
+// "TechCrunch" → "TC", "Vercel" → "Ve": a compact stand-in for the source's logo.
+function initials(name) {
+  const caps = name.match(/[A-Z]/g) ?? [];
+  return caps.length >= 2 ? caps.slice(0, 2).join('') : name.slice(0, 2);
 }
 
 function metaRow(it, extra = '') {
-  return `<div class="meta"><span class="dot cat-${it.cat}" title="${CATS[it.cat]}"></span><span class="src">${esc(it.sourceName)}</span><span>·</span><time datetime="${it.date}" title="${new Date(it.date).toLocaleString('vi-VN')}">${ago(it.date)}</time>${extra}${readLink(it.url, it.lang)}</div>`;
+  return `<div class="meta"><span class="src">${esc(it.sourceName)}</span><span class="sep"></span><time datetime="${it.date}" title="${new Date(it.date).toLocaleString('vi-VN')}">${ago(it.date)}</time>${extra}</div>`;
 }
 
 function renderHot() {
@@ -400,11 +416,11 @@ function renderHot() {
           .join('');
         const summary = tx(it, 'summary');
         return `<article class="hot">
-          <div>
-            ${metaRow(it, `<span class="count">${c.sourceCount} nguồn cùng đưa tin</span>`)}
+          <div class="min0">
+            <div class="meta"><span class="dot cat-${it.cat}"></span><span class="src">${esc(it.sourceName)}</span><span class="sep"></span><span>${ago(it.date)}</span><span class="badge">${c.sourceCount} nguồn cùng đưa</span></div>
             ${link(it.url, esc(tx(it, 'title')), 'title')}
             ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
-            ${related ? `<div class="related-label">Các nguồn khác viết:</div><ul class="related">${related}</ul>` : ''}
+            ${related ? `<details class="related"><summary>Các nguồn khác viết gì ${icon('chevron')}</summary><ul>${related}</ul></details>` : ''}
           </div>
           ${thumb(it.image)}
         </article>`;
@@ -454,7 +470,7 @@ function renderRiver() {
   const list = filteredItems();
   setHTML(
     '#active-filter',
-    state.trend ? `Đang xem tin về: <strong>${esc(state.trend.name)}</strong> <button type="button" id="clear-trend">Bỏ lọc ✕</button>` : '',
+    state.trend ? `Đang xem tin về: <strong>${esc(state.trend.name)}</strong> <button type="button" id="clear-trend">Bỏ lọc</button>` : '',
   );
   if (!list.length) {
     setHTML('#river', '<p class="empty">Không có tin nào khớp. Thử chọn khoảng thời gian dài hơn hoặc bỏ bớt điều kiện lọc.</p>');
@@ -472,10 +488,11 @@ function renderRiver() {
         lastDay = day;
         const summary = tx(it, 'summary');
         return `${head}<article class="item">
-          <div>
-            ${metaRow(it)}
+          <span class="src-badge" style="background:var(--cat-${it.cat})" title="${esc(it.sourceName)}">${esc(initials(it.sourceName))}</span>
+          <div class="min0">
             ${link(it.url, esc(tx(it, 'title')), 'title')}
             ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
+            ${metaRow(it)}
           </div>
           ${thumb(it.image)}
         </article>`;
@@ -505,7 +522,7 @@ function renderTrends() {
             const delta = diff > 0 ? `<small class="up">▲${diff}</small>` : diff < 0 ? `<small class="down">▼${-diff}</small>` : '<small>=</small>';
             return `<button class="trend" type="button" data-trend="${esc(t.name)}" title="${t.now} bài tuần này, ${t.before} bài tuần trước. Bấm để xem các tin này.">
               <span class="name">${esc(t.name)}</span>
-              <span><span class="bar" style="display:block;width:${(t.now / max) * 100}%"></span></span>
+              <span class="bar-track"><span class="bar" style="display:block;width:${(t.now / max) * 100}%"></span></span>
               <span class="val">${t.now} ${delta}</span>
             </button>`;
           })
@@ -537,13 +554,18 @@ function renderSources() {
 
 // On a static host the data is only as fresh as the last scheduled build, so say how old it is.
 function renderUpdated() {
+  const text = `Cập nhật ${ago(data.news.generatedAt)}`;
   const el = $('#updated');
-  el.textContent = `Cập nhật ${ago(data.news.generatedAt)}`;
-  el.title = new Date(data.news.generatedAt).toLocaleString('vi-VN');
+  if (el) {
+    el.textContent = text;
+    el.title = new Date(data.news.generatedAt).toLocaleString('vi-VN');
+  }
+  setHTML('#updated-mobile', esc(text));
 }
 
 function renderNews(news) {
   data.news = news;
+  setCount('news', news.items.filter((it) => Date.now() - Date.parse(it.date) < DAY).length);
   renderUpdated();
   renderHot();
   renderTrends();
@@ -557,14 +579,15 @@ function renderNews(news) {
 
 function renderRepos(repos) {
   data.repos = repos;
+  setCount('repos', repos.trending.length);
   const rising = state.repoMode === 'rising';
   const list = rising ? repos.rising : repos.trending;
   for (const b of $$('#repo-mode button')) b.setAttribute('aria-pressed', b.dataset.mode === state.repoMode);
   setHTML(
     '#repo-hint',
     rising
-      ? 'Repo về AI được tạo trong 30 ngày qua, xếp theo tổng số sao.'
-      : 'Repo về AI trên <a href="https://github.com/trending?since=weekly" target="_blank" rel="noopener">GitHub Trending</a>, xếp theo số sao tăng thêm trong tuần.',
+      ? 'Repo AI được tạo trong 30 ngày qua, xếp theo tổng số sao.'
+      : 'Repo AI trên <a href="https://github.com/trending?since=weekly" target="_blank" rel="noopener">GitHub Trending</a>, xếp theo số sao tăng thêm trong tuần.',
   );
   if (!list.length) {
     setHTML('#repos', `<p class="empty">${rising && repos.risingError ? 'Chưa lấy được danh sách repo mới (GitHub giới hạn lượt truy cập). Lần cập nhật sau sẽ có.' : 'Chưa có dữ liệu.'}</p>`);
@@ -574,17 +597,19 @@ function renderRepos(repos) {
       list
         .map((r, i) => {
           const [owner, name] = r.name.split('/');
-          const growth = rising
-            ? `<span>tạo ${ago(r.created)}</span>`
-            : `<span class="up">▲ ${nf0.format(r.week || r.today)} sao ${r.week ? 'tuần này' : 'hôm nay'}</span>`;
-          const topics = (r.topics ?? []).slice(0, 5).map((t) => `<span class="tag">${esc(t)}</span>`).join('');
+          const topics = (r.topics ?? []).slice(0, 4).map((t) => `<span class="tag">${esc(t)}</span>`).join('');
+          const lang = r.language ? `<span><span class="lang-dot" style="background:${LANG_COLORS[r.language] ?? 'var(--muted)'}"></span> ${esc(r.language)}</span>` : '';
           return `<article class="repo">
             <div class="rank">${i + 1}</div>
             ${avatar(owner)}
-            <div class="repo-body">
+            <div class="min0">
               ${link(r.url, `${esc(owner)}/<b>${esc(name)}</b>`, 'repo-name')}
               ${r.description ? `<p>${esc(tx(r, 'description'))}</p>` : ''}
-              <div class="meta">${growth}<span>·</span><span>★ ${nf0.format(r.stars)} sao</span>${r.language ? `<span>·</span><span>${esc(r.language)}</span>` : ''}${topics}</div>
+              <div class="meta">${lang}${rising ? `<span>tạo ${ago(r.created)}</span>` : ''}${topics}</div>
+            </div>
+            <div class="repo-side">
+              ${rising ? '' : `<span class="pill-up" title="Sao tăng thêm ${r.week ? 'tuần này' : 'hôm nay'}">${icon('trend')}+${nf0.format(r.week || r.today)}</span>`}
+              <span class="stars" title="Tổng số sao">${icon('star')}${big(r.stars)}</span>
             </div>
           </article>`;
         })
@@ -610,7 +635,7 @@ function renderTech(tech) {
           t.hf ? `${t.hf} mô hình/ứng dụng` : '',
         ].filter(Boolean);
         const examples = t.examples.map((e) => link(e.url, esc(e.name))).join(', ');
-        const headline = t.headline ? `<div class="tech-news">📰 ${link(t.headline.url, esc(tx(t.headline, 'title')))} <span class="muted">— ${esc(t.headline.source)}</span></div>` : '';
+        const headline = t.headline ? `<div class="tech-news">${link(t.headline.url, esc(tx(t.headline, 'title')))} <span class="muted">— ${esc(t.headline.source)}</span></div>` : '';
         return `<article class="tech${i < 3 ? ' top' : ''}">
           <div class="tech-head"><h3>${esc(t.name)}</h3><span class="tech-count">${t.total}</span></div>
           <div class="tech-bar"><span style="width:${(t.total / max) * 100}%"></span></div>
@@ -642,7 +667,7 @@ function renderModels(models) {
           const desc = tx(m, 'description');
           return `<div class="mini">
             ${link(m.url, esc(m.name.replace(/^[^:]+:\s*/, '')), 'name')}
-            <div class="meta"><span class="src">${esc(providerName(m.provider))}</span><span>·</span><span>ra mắt ${ago(m.created)}</span>${m.free ? '<span>·</span><span class="tag">Miễn phí</span>' : ''}</div>
+            <div class="meta"><span class="src">${esc(providerName(m.provider))}</span><span class="sep"></span><span>ra mắt ${ago(m.created)}</span>${m.free ? '<span class="tag">Miễn phí</span>' : ''}</div>
             ${desc ? `<p>${esc(desc)}</p>` : ''}
           </div>`;
         })
@@ -661,9 +686,9 @@ function renderTools(tools) {
       .slice(0, 12)
       .map(
         (m) => `<div class="mini">
-          ${link(m.url, esc(m.id.split('/')[1]), 'name')}
-          <div class="meta"><span class="src">${esc(m.author)}</span>${m.taskVi ? `<span>·</span><span class="tag">${esc(m.taskVi)}</span>` : ''}</div>
-          <div class="meta"><span>♥ ${big(m.likes)} lượt thích</span><span>·</span><span>⬇ ${big(m.downloads)} lượt tải</span></div>
+          ${link(m.url, esc(m.id.split('/')[1]), 'name mono')}
+          <div class="meta"><span class="src">${esc(m.author)}</span>${m.taskVi ? `<span class="tag">${esc(m.taskVi)}</span>` : ''}</div>
+          <div class="meta"><span>${big(m.likes)} lượt thích</span><span class="sep"></span><span>${big(m.downloads)} lượt tải</span></div>
         </div>`,
       )
       .join(''),
@@ -676,7 +701,7 @@ function renderTools(tools) {
         const desc = tx(s, 'description');
         return `<div class="mini">
           ${link(s.url, `${s.emoji ? `${esc(s.emoji)} ` : ''}${esc(s.title)}`, 'name')}
-          <div class="meta"><span class="src">${esc(s.author)}</span><span>·</span><span>♥ ${big(s.likes)}</span></div>
+          <div class="meta"><span class="src">${esc(s.author)}</span><span class="sep"></span><span>${big(s.likes)} lượt thích</span></div>
           ${desc ? `<p>${esc(desc)}</p>` : ''}
         </div>`;
       })
@@ -690,17 +715,22 @@ function renderPapers(res) {
   data.papers = res;
   setHTML(
     '#papers',
-    res.papers
-      .slice(0, 24)
-      .map((p) => {
-        const summary = tx(p, 'summary');
-        return `<article class="paper">
-          ${link(p.url, esc(tx(p, 'title')), 'name')}
-          <div class="meta"><span class="votes">▲ ${p.upvotes} lượt thích</span>${p.org ? `<span>·</span><span>${esc(p.org)}</span>` : ''}<span>·</span><span>${ago(p.date)}</span></div>
-          ${summary ? `<p>${esc(summary)}</p>` : ''}
-        </article>`;
-      })
-      .join(''),
+    res.papers.length
+      ? res.papers
+          .slice(0, 24)
+          .map((p) => {
+            const summary = tx(p, 'summary');
+            return `<article class="paper">
+              <div class="votes" title="Lượt thích">${p.upvotes}<small>thích</small></div>
+              <div class="min0">
+                ${link(p.url, esc(tx(p, 'title')), 'name')}
+                ${summary ? `<p>${esc(summary)}</p>` : ''}
+                <div class="meta">${p.org ? `<span class="src">${esc(p.org)}</span><span class="sep"></span>` : ''}<span>${ago(p.date)}</span></div>
+              </div>
+            </article>`;
+          })
+          .join('')
+      : '<p class="empty">Hôm nay chưa có paper nào về làm phần mềm.</p>',
   );
 }
 
@@ -736,6 +766,7 @@ const PROMPTS = [
 
 const idea = { problem: null, techs: [], scores: {}, note: '', entryId: null };
 let myProblems = [];
+let problemQuery = '';
 let book = [];
 
 function stored(key) {
@@ -803,13 +834,12 @@ function sparkCard(s, i, compact = false) {
   }
   const desc = tx(it, 'desc');
   return `<article class="spark-card">
-    <div class="meta">${kindTag(it.k)}<span>·</span><span>${esc(it.note)}</span><span class="tag">${s.strong ? 'Đúng chủ đề' : 'Kết nối bất ngờ'}</span></div>
-    ${link(it.url, esc(tx(it, 'title')), 'spark-src')}
+    <div class="meta">${kindTag(it.k)}<span class="sep"></span><span>${esc(it.note)}</span><span class="tag">${s.strong ? 'Đúng chủ đề' : 'Kết nối bất ngờ'}</span></div>
+    ${link(it.url, esc(tx(it, 'title')), it.k === 'repo' ? 'spark-src' : 'spark-src plain')}
     ${desc ? `<p class="spark-desc">${esc(desc)}</p>` : ''}
-    <div class="spark-join">ghép với bài toán</div>
-    <div class="spark-problem"><small>${esc(p.area)}</small>${esc(p.title)}</div>
+    <div class="spark-problem">${icon('arrow')}${esc(p.title)}</div>
     <p class="spark-q">${esc(q)}</p>
-    <button class="linkbtn" type="button" data-spark="${i}">Phát triển ý tưởng này →</button>
+    <button class="linkbtn" type="button" data-spark="${i}">Phát triển ý tưởng này ${icon('arrow')}</button>
   </article>`;
 }
 
@@ -820,11 +850,20 @@ function renderSparks() {
 }
 
 function renderProblemPicker() {
+  const q = fold(problemQuery.trim());
+  const list = allProblems().filter((p) => !q || fold(`${p.title} ${p.area} ${p.who ?? ''}`).includes(q));
+  const groups = new Map();
+  for (const p of list) {
+    const area = p.mine ? 'Của bạn' : p.area;
+    groups.set(area, [...(groups.get(area) ?? []), p]);
+  }
   setHTML(
     '#problem-picker',
-    allProblems()
-      .map((p) => `<button type="button" class="pick${p.mine ? ' mine' : ''}" data-problem="${esc(p.id)}" aria-pressed="${idea.problem === p.id}"><small>${esc(p.area)}</small>${esc(p.title)}</button>`)
-      .join(''),
+    list.length
+      ? [...groups]
+          .map(([area, ps]) => `<div class="pick-area">${esc(area)}</div>${ps.map((p) => `<button type="button" class="pick" data-problem="${esc(p.id)}" aria-pressed="${idea.problem === p.id}">${esc(p.title)}</button>`).join('')}`)
+          .join('')
+      : '<p class="hint">Không có bài toán nào khớp.</p>',
   );
 }
 
@@ -855,7 +894,7 @@ function renderTechPicker() {
 function renderIdeaCard() {
   const p = problemOf(idea.problem);
   if (!p) {
-    setHTML('#idea-card', '<div class="idea-empty"><div class="bulb">💡</div><p>Chọn một bài toán và một công nghệ, hoặc bấm <b>🎲 Ghép ngẫu nhiên</b>, để thấy ý tưởng nháp ở đây.</p></div>');
+    setHTML('#idea-card', `<div class="idea-empty">${icon('bulb')}<p>Chọn một bài toán và một công nghệ ở bên trái, hoặc bấm <b>Ngẫu nhiên</b>, để thấy ý tưởng nháp ở đây.</p></div>`);
     return;
   }
   const facts = `<dl class="facts">
@@ -1022,13 +1061,14 @@ function currentEntry() {
 }
 
 function renderBook() {
+  setCount('book', book.length);
   if (!book.length) {
     setHTML('#book', '<p class="empty">Chưa có ý tưởng nào. Ghép một ý tưởng, chấm điểm rồi bấm “Lưu vào sổ”.</p>');
     return;
   }
   setHTML(
     '#book',
-    `<div class="book-head"><span class="muted">${book.length} ý tưởng</span><button class="btn" type="button" data-act="export">Tải sổ về (.md)</button></div>
+    `<div class="book-head"><span class="muted">${book.length} ý tưởng</span><button class="btn" type="button" data-act="export">${icon('download')}Tải sổ về (.md)</button></div>
     <div class="book-list">${book
       .slice()
       .reverse()
@@ -1057,6 +1097,12 @@ function renderIdeas(res, force = false) {
   renderComposer();
   renderNodes();
   renderBook();
+}
+
+// The ideas tab has three views: composer, bottleneck map, notebook.
+function setIdeaView(view) {
+  for (const b of $$('#idea-view [data-view]')) b.setAttribute('aria-pressed', b.dataset.view === view);
+  for (const pane of $$('[data-view-pane]')) pane.hidden = pane.dataset.viewPane !== view;
 }
 
 function pickIdea(next) {
@@ -1136,7 +1182,10 @@ function ideaAction(t) {
     renderNodes();
     return;
   }
-  if ('go' in ds || ds.spark || ds.open) $('#composer').scrollIntoView({ block: 'start' });
+  if ('go' in ds || ds.spark || ds.open) {
+    setIdeaView('compose');
+    $('#composer').scrollIntoView({ block: 'start' });
+  }
 }
 
 function initIdeas() {
@@ -1144,11 +1193,14 @@ function initIdeas() {
   book = stored('ideaBook');
   const page = $('#ideas');
   page.addEventListener('click', (e) => {
+    const view = e.target.closest('[data-view]');
+    if (view) { setIdeaView(view.dataset.view); return; }
     const t = e.target.closest('[data-problem],[data-tech],[data-spark],[data-act],[data-score],[data-open],[data-del],[data-del-problem]');
     if (t && data.ideas) ideaAction(t);
   });
   page.addEventListener('input', (e) => {
     if (e.target.id === 'idea-note') idea.note = e.target.value;
+    if (e.target.id === 'problem-filter') { problemQuery = e.target.value; renderProblemPicker(); }
   });
   $('#my-problem-form').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1167,13 +1219,153 @@ function initIdeas() {
   });
 }
 
+// ---------- quick search (Ctrl/⌘ K) ----------
+
+const PAGE_ICONS = { 'tong-quan': 'home', 'tin-tuc': 'news', repo: 'repo', 'cong-nghe': 'layers', 'y-tuong': 'bulb', 'nghien-cuu': 'book', 'ky-luc': 'trophy' };
+// With an empty query, show only a few starting points.
+const PAL_START = { 'Trang': 7, 'Tin tức': 4, 'Repo': 4 };
+let palIndex = [];
+let palItems = [];
+let palSel = 0;
+
+function searchIndex() {
+  const out = [];
+  for (const a of $$('.nav a[data-tab]')) out.push({ group: 'Trang', icon: PAGE_ICONS[a.dataset.tab], title: a.querySelector('span').textContent, tab: a.dataset.tab });
+  for (const p of data.ideas ? allProblems() : []) out.push({ group: 'Bài toán', icon: 'bulb', title: p.title, sub: p.area, problem: p.id });
+  for (const t of data.tech?.techs ?? []) out.push({ group: 'Công nghệ', icon: 'layers', title: t.name, sub: `${t.total} lượt nhắc`, tab: 'cong-nghe', extra: t.what });
+  for (const r of [...(data.repos?.trending ?? []), ...(data.repos?.rising ?? [])]) out.push({ group: 'Repo', icon: 'repo', title: r.name, sub: tx(r, 'description'), url: r.url, extra: r.description });
+  for (const m of data.models?.models ?? []) out.push({ group: 'Mô hình', icon: 'cpu', title: m.name.replace(/^[^:]+:\s*/, ''), sub: providerName(m.provider), url: m.url });
+  for (const m of data.tools?.models ?? []) out.push({ group: 'Mô hình', icon: 'download', title: m.id, sub: m.taskVi ?? '', url: m.url });
+  for (const s of data.tools?.spaces ?? []) out.push({ group: 'Ứng dụng', icon: 'spark', title: s.title, sub: tx(s, 'description'), url: s.url, extra: s.description });
+  for (const p of data.papers?.papers ?? []) out.push({ group: 'Nghiên cứu', icon: 'book', title: tx(p, 'title'), sub: p.org ?? '', url: p.url, extra: p.title });
+  for (const it of data.news?.items ?? []) out.push({ group: 'Tin tức', icon: 'news', title: tx(it, 'title'), sub: `${it.sourceName} · ${ago(it.date)}`, url: it.url, extra: it.title });
+  for (const it of out) it.key = fold(`${it.title} ${it.sub ?? ''} ${it.extra ?? ''}`);
+  return out;
+}
+
+function renderPalette() {
+  const words = fold($('#palette-q').value).split(/\s+/).filter(Boolean);
+  const groups = new Map();
+  for (const it of palIndex) {
+    const cap = words.length ? 6 : PAL_START[it.group];
+    if (!cap || (words.length && !words.every((w) => it.key.includes(w)))) continue;
+    const list = groups.get(it.group) ?? [];
+    if (list.length < cap) groups.set(it.group, [...list, it]);
+  }
+  palItems = [...groups.values()].flat();
+  palSel = Math.max(0, Math.min(palSel, palItems.length - 1));
+  let n = 0;
+  setHTML(
+    '#palette-results',
+    palItems.length
+      ? [...groups]
+          .map(([g, list]) => `<div class="pal-group">${g}</div>${list
+            .map((it) => {
+              const i = n++;
+              return `<div class="pal-item" role="option" data-pal="${i}" aria-selected="${i === palSel}">${icon(it.icon)}<span class="t">${esc(it.title)}</span>${it.sub ? `<span class="s">${esc(it.sub)}</span>` : ''}${it.url ? icon('external') : ''}</div>`;
+            })
+            .join('')}`)
+          .join('')
+      : '<p class="empty">Không tìm thấy gì. Thử từ khóa khác, ví dụ “agent”, “Claude”, “bảo mật”.</p>',
+  );
+}
+
+function selectPal(i) {
+  palSel = i;
+  for (const el of $$('.pal-item')) el.setAttribute('aria-selected', Number(el.dataset.pal) === i);
+  $(`.pal-item[data-pal="${i}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+
+function openPalette() {
+  palIndex = searchIndex();
+  palSel = 0;
+  $('#palette').hidden = false;
+  $('#palette-q').value = '';
+  renderPalette();
+  $('#palette-q').focus();
+}
+
+function closePalette() {
+  const pal = $('#palette');
+  if (pal) pal.hidden = true;
+}
+
+function openPal(it) {
+  if (!it) return;
+  closePalette();
+  if (it.url) {
+    window.open(it.url, '_blank', 'noopener');
+  } else if (it.problem) {
+    goTab('y-tuong');
+    setIdeaView('compose');
+    pickIdea({ problem: it.problem });
+    $('#composer').scrollIntoView({ block: 'start' });
+  } else if (it.tab) {
+    goTab(it.tab);
+  }
+}
+
+function initPalette() {
+  const input = $('#palette-q');
+  input.addEventListener('input', () => { palSel = 0; renderPalette(); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (palItems.length) selectPal((palSel + (e.key === 'ArrowDown' ? 1 : -1) + palItems.length) % palItems.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      openPal(palItems[palSel]);
+    }
+  });
+  const results = $('#palette-results');
+  results.addEventListener('mousemove', (e) => {
+    const el = e.target.closest('.pal-item');
+    if (el && Number(el.dataset.pal) !== palSel) selectPal(Number(el.dataset.pal));
+  });
+  results.addEventListener('click', (e) => {
+    const el = e.target.closest('.pal-item');
+    if (el) openPal(palItems[Number(el.dataset.pal)]);
+  });
+  $('#palette').addEventListener('mousedown', (e) => { if (e.target.id === 'palette') closePalette(); });
+  for (const b of $$('[data-open-search]')) b.addEventListener('click', openPalette);
+  if (/Mac|iPhone|iPad/.test(navigator.platform)) for (const k of $$('kbd')) k.textContent = k.textContent.replace('Ctrl', '⌘');
+  addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      if ($('#palette').hidden) openPalette();
+      else closePalette();
+    } else if (e.key === '/' && $('#palette').hidden && !e.target.closest('input, textarea, select, [contenteditable]')) {
+      e.preventDefault();
+      openPalette();
+    } else if (e.key === 'Escape') {
+      closePalette();
+      closeSheet();
+    }
+  });
+}
+
+// ---------- phone "Thêm" sheet & theme ----------
+
+function closeSheet() {
+  const sheet = $('#more-sheet');
+  if (sheet) sheet.hidden = true;
+}
+
+function syncThemeIcon() {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  for (const use of $$('[data-theme-toggle] use')) use.setAttribute('href', dark ? '#i-sun' : '#i-moon');
+}
+
 // Re-render every text that has a Vietnamese version.
 function renderLanguage() {
   const btn = $('#lang');
   if (btn) {
-    btn.textContent = state.lang === 'vi' ? 'Bản gốc' : 'Tiếng Việt';
+    btn.querySelector('span').textContent = state.lang === 'vi' ? 'Bản gốc' : 'Tiếng Việt';
     btn.title = state.lang === 'vi' ? 'Đang hiện bản dịch tiếng Việt. Bấm để xem tiêu đề gốc tiếng Anh.' : 'Đang hiện bản gốc. Bấm để xem bản dịch tiếng Việt.';
   }
+  const mobile = $('#lang-mobile span');
+  if (mobile) mobile.textContent = state.lang === 'vi' ? 'Xem bản gốc tiếng Anh' : 'Xem bản dịch tiếng Việt';
   if (data.news) { renderHot(); renderRiver(); renderOverviewHot(); }
   if (data.repos) renderRepos(data.repos);
   if (data.tech) renderTech(data.tech);
@@ -1187,8 +1379,8 @@ function renderLanguage() {
 
 async function loadAll(force = false) {
   const btn = $('#refresh');
-  btn.disabled = true;
-  btn.textContent = 'Đang tải…';
+  btn?.classList.add('spin');
+  if (btn) btn.disabled = true;
   const load = (name, render, targets) => api(name, force).then(render).catch((e) => fail(targets, e));
   await Promise.all([
     load('news', renderNews, ['#hot', '#river', '#ov-hot']),
@@ -1200,8 +1392,8 @@ async function loadAll(force = false) {
     load('progress', renderProgress, ['#bench', '#ov-bench']),
     load('ideas', renderIdeas, ['#sparks', '#problem-picker', '#nodes', '#ov-sparks']),
   ]);
-  btn.disabled = false;
-  btn.textContent = 'Làm mới';
+  btn?.classList.remove('spin');
+  if (btn) btn.disabled = false;
 }
 
 // ---------- events ----------
@@ -1265,18 +1457,30 @@ function initControls() {
   addEventListener('hashchange', route);
   addEventListener('resize', measureSticky);
 
-  $('#lang')?.addEventListener('click', () => {
+  const toggleLang = () => {
     state.lang = state.lang === 'vi' ? 'en' : 'vi';
     remember('lang', state.lang);
     renderLanguage();
-  });
+  };
+  $('#lang')?.addEventListener('click', toggleLang);
+  $('#lang-mobile')?.addEventListener('click', () => { toggleLang(); closeSheet(); });
 
-  $('#theme').addEventListener('click', () => {
-    const root = document.documentElement;
-    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-    root.dataset.theme = dark ? 'light' : 'dark';
-    remember('theme', root.dataset.theme);
-  });
+  for (const b of $$('[data-theme-toggle]')) {
+    b.addEventListener('click', () => {
+      const root = document.documentElement;
+      const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      root.dataset.theme = dark ? 'light' : 'dark';
+      remember('theme', root.dataset.theme);
+      syncThemeIcon();
+    });
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncThemeIcon);
+
+  $('#more-btn')?.addEventListener('click', () => { $('#more-sheet').hidden = false; });
+  $('#more-sheet')?.addEventListener('click', (e) => { if (e.target.id === 'more-sheet') closeSheet(); });
+
+  const today = $('#today');
+  if (today) today.textContent = new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 try {
@@ -1294,6 +1498,8 @@ try {
   renderLanguage();
   initSparkHover();
   initIdeas();
+  initPalette();
+  syncThemeIcon();
 } catch (err) {
   console.error(err);
 }

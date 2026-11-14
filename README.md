@@ -10,7 +10,7 @@ Mở http://localhost:5050 (đổi cổng bằng `PORT=8080 npm start`).
 
 ## Trang có gì
 
-Trang chia thành các tab; tab **Tổng quan** tóm tắt mỗi phần vài dòng.
+Thanh bên trái (trên điện thoại là thanh dưới cùng) chuyển giữa các mục; **Ctrl K** (hoặc phím `/`) mở ô tìm nhanh tin, repo, mô hình, paper và bài toán. Tab **Tổng quan** tóm tắt mỗi phần vài dòng.
 
 | Tab | Nội dung | Nguồn dữ liệu |
 |---|---|---|
