@@ -434,8 +434,11 @@ function renderPapers(res) {
 
 // Re-render every text that has a Vietnamese version.
 function renderLanguage() {
-  $('#lang').textContent = state.lang === 'vi' ? 'Xem bản gốc' : 'Xem tiếng Việt';
-  $('#lang').title = state.lang === 'vi' ? 'Đang hiện bản dịch tiếng Việt. Bấm để xem tiêu đề gốc tiếng Anh.' : 'Đang hiện bản gốc. Bấm để xem bản dịch tiếng Việt.';
+  const btn = $('#lang');
+  if (btn) {
+    btn.textContent = state.lang === 'vi' ? 'Xem bản gốc' : 'Xem tiếng Việt';
+    btn.title = state.lang === 'vi' ? 'Đang hiện bản dịch tiếng Việt. Bấm để xem tiêu đề gốc tiếng Anh.' : 'Đang hiện bản gốc. Bấm để xem bản dịch tiếng Việt.';
+  }
   if (data.news) { renderHot(); renderRiver(); }
   if (data.models) renderModels(data.models);
   if (data.papers) renderPapers(data.papers);
@@ -500,7 +503,7 @@ function initControls() {
   });
   $('#refresh').addEventListener('click', () => loadAll(true));
 
-  $('#lang').addEventListener('click', () => {
+  $('#lang')?.addEventListener('click', () => {
     state.lang = state.lang === 'vi' ? 'en' : 'vi';
     remember('lang', state.lang);
     renderLanguage();
@@ -520,9 +523,15 @@ try {
   if (localStorage.getItem('lang') === 'en') state.lang = 'en';
 } catch {}
 
-initControls();
-renderLanguage();
-initSparkHover();
+// Right after a deploy the browser may pair a cached older index.html with this
+// script; a missing control must never stop the data from loading.
+try {
+  initControls();
+  renderLanguage();
+  initSparkHover();
+} catch (err) {
+  console.error(err);
+}
 loadAll();
 setInterval(() => loadAll(), REFRESH_MS);
 // Keep "x phút trước" labels honest between refreshes.
