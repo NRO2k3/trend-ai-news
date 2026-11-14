@@ -33,6 +33,12 @@
       <symbol id="i-trend" viewBox="0 0 24 24"><path d="M22 7 13.5 15.5l-5-5L2 17M16 7h6v6"/></symbol>
       <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
       <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></symbol>
+      <symbol id="i-layout" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></symbol>
+      <symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
+      <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+      <symbol id="i-coins" viewBox="0 0 24 24"><circle cx="8" cy="8" r="6"/><path d="M18.1 10.4A6 6 0 1 1 10.3 18M7 6h1v4M16.7 13.9l.7.7-2.8 2.8"/></symbol>
+      <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
       <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/></symbol>
       <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M2 18h1.4c1.3 0 2.5-.6 3.3-1.7l6.1-8.6c.7-1.1 2-1.7 3.3-1.7H22M18 2l4 4-4 4M2 6h1.9c1.5 0 2.9.9 3.6 2.2M22 18h-5.9c-1.3 0-2.6-.7-3.3-1.8l-.5-.8M18 14l4 4-4 4"/></symbol>
       <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -64,7 +70,7 @@
         <a href="#cong-nghe" data-tab="cong-nghe"><svg class="i"><use href="#i-layers"/></svg><span>Công nghệ &amp; công cụ</span></a>
         <a href="#y-tuong" data-tab="y-tuong"><svg class="i"><use href="#i-bulb"/></svg><span>Ý tưởng</span><em class="count" data-count="book"></em></a>
         <a href="#nghien-cuu" data-tab="nghien-cuu"><svg class="i"><use href="#i-book"/></svg><span>Nghiên cứu</span></a>
-        <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg><span>Cuộc đua model</span></a>
+        <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg><span>Chọn model AI</span></a>
       </nav>
       <div class="sidebar-foot">
         <div class="status"><span class="live"></span><span id="updated">Đang tải…</span></div>
@@ -124,7 +130,7 @@
           </div>
         </div>
         <section class="panel">
-          <div class="panel-head"><h2><svg class="i"><use href="#i-trophy"/></svg>AI code giỏi tới đâu rồi</h2><a class="more" href="#ky-luc">Cuộc đua model<svg class="i"><use href="#i-arrow"/></svg></a></div>
+          <div class="panel-head"><h2><svg class="i"><use href="#i-trophy"/></svg>AI code giỏi tới đâu rồi</h2><a class="more" href="#ky-luc">Chọn model AI<svg class="i"><use href="#i-arrow"/></svg></a></div>
           <div id="ov-bench" class="ov-bench"><div class="skeleton"></div></div>
         </section>
       </section>
@@ -295,32 +301,58 @@
       <section class="page" data-page="ky-luc" hidden>
         <header class="page-head">
           <div>
-            <h1>Cuộc đua model</h1>
-            <p class="lede">Model nào làm web, viết code giỏi nhất, rẻ nhất, và hãng nào đang dẫn. Điểm từ <a href="https://epoch.ai/benchmarks" target="_blank" rel="noopener">Epoch AI</a>, giá từ <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a>.</p>
-          </div>
-          <div class="seg" id="race-bench" role="group" aria-label="Bài kiểm tra">
-            <button type="button" data-bench="web" aria-pressed="true">Làm web</button>
-            <button type="button" data-bench="code" aria-pressed="false">Lập trình</button>
-            <button type="button" data-bench="terminal" aria-pressed="false">Terminal</button>
+            <h1>Chọn model AI cho việc của bạn</h1>
+            <p class="lede">Mỗi model giỏi một kiểu, giá chênh nhau cả trăm lần. Chọn việc bạn cần AI làm: trang gợi ý model nên dùng, nói rõ vì sao, tốn bao nhiêu và mạnh yếu ở đâu.</p>
           </div>
         </header>
+        <details class="glossary">
+          <summary><svg class="i"><use href="#i-book"/></svg>Lần đầu xem? Giải thích nhanh các từ hay gặp<svg class="i"><use href="#i-chevron"/></svg></summary>
+          <dl>
+            <dt>Model</dt><dd>“Bộ não” AI bạn gọi tới, ví dụ Claude Opus, GPT, Gemini, DeepSeek. Cùng một câu hỏi, model khác nhau trả lời khác nhau về độ giỏi và giá.</dd>
+            <dt>Token</dt><dd>Đơn vị AI đọc và viết, khoảng 4 ký tự tiếng Anh; tiếng Việt thường tốn nhiều token hơn. 1 triệu token tương đương khoảng 1.500 trang sách tiếng Anh.</dd>
+            <dt>Giá đọc / viết</dt><dd>Tiền trả cho mỗi 1 triệu token AI <b>đọc vào</b> (câu hỏi, code, tài liệu bạn gửi) và <b>viết ra</b> (câu trả lời). Viết thường đắt gấp 3–8 lần đọc.</dd>
+            <dt>Ngữ cảnh</dt><dd>Lượng chữ model đọc được trong một lần. Ngữ cảnh 1 triệu token đọc được cả một dự án code vừa phải.</dd>
+            <dt>Mã nguồn mở</dt><dd>Model ai cũng tải về được (DeepSeek, Qwen, GLM, Kimi…): tự chạy trên máy chủ của bạn để dữ liệu không ra ngoài, hoặc thuê qua API với giá rẻ. Mã nguồn đóng (Claude, GPT, Gemini) chỉ dùng được qua API của hãng.</dd>
+            <dt>Bài kiểm tra</dt><dd>Cùng một bộ đề chấm cho mọi model để so sánh công bằng (tiếng Anh gọi là benchmark). Trang dùng kết quả do <a href="https://epoch.ai/benchmarks" target="_blank" rel="noopener">Epoch AI</a> tổng hợp; giá lấy từ <a href="https://openrouter.ai/models" target="_blank" rel="noopener">OpenRouter</a>.</dd>
+          </dl>
+        </details>
+
+        <h2 class="step-title"><span class="num">1</span>Bạn cần AI làm gì?</h2>
+        <div class="uses" id="race-bench" role="group" aria-label="Việc cần AI làm">
+          <button type="button" class="use" data-bench="web" aria-pressed="true"><svg class="i"><use href="#i-layout"/></svg><b>Dựng giao diện web</b><span>Tả bằng lời hoặc đưa ảnh thiết kế, AI viết ra trang chạy được.</span></button>
+          <button type="button" class="use" data-bench="code" aria-pressed="false"><svg class="i"><use href="#i-code"/></svg><b>Viết, sửa code trong dự án</b><span>Agent trong Cursor, Claude Code đọc cả dự án rồi sửa nhiều file.</span></button>
+          <button type="button" class="use" data-bench="terminal" aria-pressed="false"><svg class="i"><use href="#i-terminal"/></svg><b>Tự chạy lệnh, DevOps</b><span>Cài đặt, build, sửa cấu hình, deploy mà không cần người gõ lệnh.</span></button>
+          <button type="button" class="use" data-bench="facts" aria-pressed="false"><svg class="i"><use href="#i-chat"/></svg><b>Chatbot trả lời khách</b><span>Trả lời câu hỏi kiến thức cho đúng, không bịa.</span></button>
+        </div>
+
+        <h2 class="step-title"><span class="num">2</span>Nên dùng model nào</h2>
+        <div class="recs" id="picks"><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div></div>
         <p class="hint pane-hint" id="race-about"></p>
 
+        <h2 class="step-title"><span class="num">3</span>Tra một model: mạnh, yếu ở đâu</h2>
+        <section class="panel profile-panel">
+          <label class="profile-pick"><span>Chọn model</span><select id="profile-select" aria-label="Chọn model để xem mạnh, yếu"></select></label>
+          <div id="profile"><div class="skeleton tall"></div></div>
+        </section>
+
+        <h2 class="section-title deep-title"><svg class="i"><use href="#i-trend"/></svg>Xem sâu: cuộc đua giữa các model<span class="hint inline">cho việc đang chọn ở bước 1</span></h2>
         <section class="panel race-value">
           <div class="panel-head"><h2><svg class="i"><use href="#i-spark"/></svg>Giá so với điểm</h2><div class="legend" id="value-legend"></div></div>
+          <p class="howto"><b>Cách đọc:</b> mỗi chấm là một model. Càng cao càng giỏi, càng sang trái càng rẻ. Nên chọn trong các model nằm trên đường nét đứt: không có model nào vừa rẻ hơn vừa giỏi hơn chúng.</p>
           <p class="insight" id="value-insight"></p>
           <div class="chart" id="value-chart"><div class="skeleton tall"></div></div>
-          <p class="hint chart-note">Giá trộn 3 phần đầu vào : 1 phần đầu ra (agent code đọc nhiều hơn viết), USD cho 1 triệu token, theo giá niêm yết. Để model suy nghĩ nhiều thì tốn thêm token nên chi phí thật cao hơn. Đường nét đứt nối các model rẻ nhất ở mỗi mức điểm.</p>
+          <p class="hint chart-note">Giá trộn 3 phần đọc : 1 phần viết (AI làm code đọc nhiều hơn viết), USD cho 1 triệu token, theo giá niêm yết. Để model suy nghĩ nhiều thì tốn thêm token nên chi phí thật cao hơn.</p>
         </section>
 
         <div class="race-grid">
           <section class="panel">
             <div class="panel-head"><h2><svg class="i"><use href="#i-trend"/></svg>Cuộc đua theo hãng</h2><div class="legend" id="race-legend"></div></div>
-            <p class="hint">Điểm cao nhất của mỗi hãng theo thời gian; đường chỉ đi lên khi hãng tự phá kỷ lục của mình.</p>
+            <p class="howto"><b>Cách đọc:</b> mỗi đường là điểm cao nhất của một hãng. Đường nhảy lên khi hãng ra model mới giỏi hơn. Đường nằm trên cùng ở mép phải là hãng đang dẫn.</p>
             <div class="chart" id="race-chart"><div class="skeleton tall"></div></div>
           </section>
           <section class="panel gap-panel">
-            <div class="panel-head"><h2><svg class="i"><use href="#i-repo"/></svg>Mã nguồn mở đi sau bao xa</h2></div>
+            <div class="panel-head"><h2><svg class="i"><use href="#i-unlock"/></svg>Mã nguồn mở đi sau bao xa</h2></div>
+            <p class="howto">Model mã nguồn mở rẻ, tự cài được để giữ dữ liệu trong nhà, nhưng thường kém model đóng giỏi nhất. Kém bao nhiêu?</p>
             <div id="gap"><div class="skeleton tall"></div></div>
           </section>
         </div>
@@ -333,7 +365,7 @@
               <label class="check-pill"><input type="checkbox" id="lb-cheap">Giá dưới 1 $</label>
             </div>
           </div>
-          <p class="hint">Model ra mắt trong 12 tháng qua. Bấm tiêu đề cột để sắp xếp; ô trống là model chưa được chấm ở bài đó.</p>
+          <p class="hint">Model ra mắt trong 12 tháng qua. Bấm tên model để xem mạnh, yếu; bấm tiêu đề cột để sắp xếp. Dấu “–” là model chưa được chấm ở việc đó.</p>
           <div class="table-wrap" id="leaderboard"><div class="skeleton"></div></div>
         </section>
 
@@ -360,7 +392,7 @@
     <div class="sheet-card" role="dialog" aria-label="Thêm">
       <a href="#cong-nghe" data-tab="cong-nghe"><svg class="i"><use href="#i-layers"/></svg>Công nghệ &amp; công cụ</a>
       <a href="#nghien-cuu" data-tab="nghien-cuu"><svg class="i"><use href="#i-book"/></svg>Nghiên cứu</a>
-      <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg>Cuộc đua model</a>
+      <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg>Chọn model AI</a>
       <button type="button" id="lang-mobile"><svg class="i"><use href="#i-lang"/></svg><span>Xem bản gốc tiếng Anh</span></button>
       <p class="hint" id="updated-mobile"></p>
     </div>

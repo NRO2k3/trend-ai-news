@@ -643,10 +643,223 @@ function renderGap() {
   );
 }
 
+// ---------- advice: which model for which job ----------
+
+// What each test means for someone choosing a model. task = a typical job, for a
+// rough cost estimate (tokens read / written).
+const USES = {
+  web: { icon: 'layout', title: 'Dựng giao diện web', unit: '', task: { what: 'một trang web', in: 5000, out: 15000 } },
+  code: { icon: 'code', title: 'Viết, sửa code trong dự án', unit: 'việc', task: { what: 'một việc sửa code', in: 200000, out: 15000 } },
+  terminal: { icon: 'terminal', title: 'Tự chạy lệnh, DevOps', unit: 'nhiệm vụ', task: { what: 'một nhiệm vụ', in: 150000, out: 10000 } },
+  facts: { icon: 'chat', title: 'Chatbot trả lời khách', unit: 'câu hỏi khó', task: { what: '1.000 câu hỏi', in: 2000000, out: 400000 } },
+};
+const USE_KEYS = Object.keys(USES);
+const PICK_KINDS = {
+  best: { icon: 'trophy', label: 'Giỏi nhất', when: 'việc khó, cần chất lượng cao nhất, tiền là chuyện nhỏ.' },
+  value: { icon: 'coins', label: 'Đáng tiền nhất', when: 'dùng hằng ngày hoặc gọi số lượng lớn: gần bằng model giỏi nhất mà rẻ hơn nhiều.' },
+  open: { icon: 'unlock', label: 'Tự cài được', when: 'dữ liệu không được gửi ra ngoài, hoặc cần rẻ hết mức. Thuê qua API cũng được.' },
+};
+let profileId = null;
+let profileAuto = true;
+
+// Elo: how often people pick the lower-rated model over the higher one.
+const winRate = (diff) => 1 / (1 + 10 ** (-diff / 400));
+const fmtUsd = (v) => (v < 0.01 ? 'dưới 0,01 $' : `${(v >= 100 ? nf0 : nfPrice).format(v)} $`);
+const fmtTokens = (n) => (n >= 1e6 ? `${nf1.format(n / 1e6)} triệu` : `${nf0.format(n / 1000)} nghìn`);
+const taskCost = (m, key) => (USES[key].task.in * m.priceIn + USES[key].task.out * m.priceOut) / 1e6;
+const modelById = (id) => data.progress.race.models.find((m) => m.id === id);
+
+function ranked(key) {
+  return data.progress.race.models.filter((m) => m.scores[key]).sort((a, c) => c.scores[key].v - a.scores[key].v);
+}
+
+// Strength among the models tested on that job in the last year.
+function standing(key, m) {
+  const list = ranked(key);
+  const rank = list.indexOf(m) + 1;
+  if (!rank) return null;
+  const p = (rank - 1) / Math.max(1, list.length - 1);
+  const [label, cls] = p <= 0.1 ? ['Rất mạnh', 't1'] : p <= 0.3 ? ['Mạnh', 't2'] : p <= 0.6 ? ['Trung bình', 't3'] : ['Yếu', 't4'];
+  return { rank, n: list.length, label, cls, share: 1 - p, top: list[0] };
+}
+
+function priceStanding(m) {
+  if (m.blend == null) return null;
+  const list = data.progress.race.models.filter((x) => x.blend != null).sort((a, c) => a.blend - c.blend);
+  const p = list.indexOf(m) / Math.max(1, list.length - 1);
+  const label = p < 0.2 ? 'Rất rẻ' : p < 0.4 ? 'Rẻ' : p < 0.6 ? 'Giá vừa' : p < 0.8 ? 'Đắt' : 'Rất đắt';
+  const cheaper = Math.round((1 - p) * 100);
+  return { label, p, text: p < 0.5 ? `rẻ hơn ${cheaper}% model khác` : `đắt hơn ${100 - cheaper}% model khác` };
+}
+
+function plainScore(key, v, top) {
+  if (data.progress.race.benches[key].kind === 'elo') {
+    if (!top || top.scores[key].v <= v) return 'được người dùng chọn nhiều nhất khi đặt cạnh model khác';
+    return `đặt cạnh ${esc(shortName(top.name))}, người dùng chọn nó ${Math.round(winRate(v - top.scores[key].v) * 100)}/100 lần`;
+  }
+  return `làm đạt ${Math.round(v * 100)}/100 ${USES[key].unit}`;
+}
+
+function pickModels(key) {
+  const list = ranked(key);
+  const best = list[0];
+  const open = list.find((m) => m.open) ?? null;
+  // Cheapest model at each level of score; the value pick is the cheapest one close to the best.
+  const front = [];
+  for (const m of list.filter((x) => x.blend != null).sort((a, c) => a.blend - c.blend || c.scores[key].v - a.scores[key].v)) {
+    if (!front.length || m.scores[key].v > front.at(-1).scores[key].v) front.push(m);
+  }
+  const ref = best?.blend != null ? best : front.at(-1);
+  const cost = (m) => taskCost(m, key);
+  const top = best?.scores[key].v;
+  const elo = data.progress.race.benches[key].kind === 'elo';
+  const close = (m) => (elo ? m.scores[key].v >= top - 100 : m.scores[key].v >= top * 0.8);
+  const candidates = front.filter((m) => m !== best && m !== open && (!ref || cost(m) < cost(ref) * 0.7));
+  const value = candidates.find(close) ?? candidates.at(-1) ?? null;
+  return { best, value, open };
+}
+
+function compareToBest(key, m, best) {
+  if (!best || m === best) return '';
+  const s = m.scores[key].v;
+  const b = best.scores[key].v;
+  const elo = data.progress.race.benches[key].kind === 'elo';
+  const gap = elo ? `kém ${nf0.format(Math.round(b - s))} điểm xếp hạng` : `bằng ${Math.round((s / b) * 100)}% model giỏi nhất`;
+  // Same job-cost estimate the card shows, so the two numbers agree.
+  const ratio = m.blend != null && best.blend != null ? taskCost(best, key) / taskCost(m, key) : 0;
+  const cheaper = ratio >= 1.5 ? `, rẻ hơn ${ratio < 3 ? nf1.format(ratio) : nf0.format(Math.round(ratio))} lần` : '';
+  return `So với ${esc(shortName(best.name))}: ${gap}${cheaper}.`;
+}
+
+// "Cũng mạnh: …" / "Yếu: …" across the other jobs.
+function elsewhere(m, key) {
+  const strong = [];
+  const weak = [];
+  for (const k of USE_KEYS) {
+    if (k === key) continue;
+    const st = standing(k, m);
+    if (st?.cls === 't1' || st?.cls === 't2') strong.push(USES[k].title);
+    if (st?.cls === 't4') weak.push(USES[k].title);
+  }
+  return [strong.length && `<b>Cũng mạnh:</b> ${strong.join(', ')}`, weak.length && `<b>Yếu:</b> ${weak.join(', ')}`].filter(Boolean).join('. ');
+}
+
+function pickCard(kind, m, key, best) {
+  const K = PICK_KINDS[kind];
+  if (!m) {
+    return `<article class="rec"><div class="rec-kind">${icon(K.icon)}${K.label}</div><p class="hint">Chưa có model ${kind === 'open' ? 'mã nguồn mở ' : ''}nào được chấm ở việc này.</p></article>`;
+  }
+  const st = standing(key, m);
+  const other = elsewhere(m, key);
+  return `<article class="rec rec-${kind}">
+    <div class="rec-kind">${icon(K.icon)}${K.label}</div>
+    <button type="button" class="rec-name" data-model="${esc(m.id)}">${esc(m.name)}</button>
+    <div class="rec-org">${esc(m.org)} · ${m.open ? 'mã nguồn mở' : 'mã nguồn đóng'}</div>
+    <p class="rec-score"><b>Hạng ${st.rank}/${st.n}</b>, ${plainScore(key, m.scores[key].v, kind === 'best' ? null : best)}.</p>
+    ${kind !== 'best' ? `<p class="rec-compare">${compareToBest(key, m, best)}</p>` : ''}
+    <dl class="rec-facts">
+      <dt>Giá</dt><dd>${m.blend != null ? `${fmtPrice(m.priceIn)} đọc · ${fmtPrice(m.priceOut)} viết <small>/ 1 triệu token</small>` : 'chưa có trên OpenRouter'}</dd>
+      ${m.blend != null ? `<dt>Ước tính</dt><dd>khoảng <b>${fmtUsd(taskCost(m, key))}</b> cho ${USES[key].task.what}</dd>` : ''}
+    </dl>
+    <p class="rec-when"><b>Hợp khi:</b> ${K.when}</p>
+    ${other ? `<p class="rec-other">${other}.</p>` : ''}
+    <button type="button" class="linkbtn rec-more" data-model="${esc(m.id)}">Xem mạnh, yếu ${icon('arrow')}</button>
+  </article>`;
+}
+
+function renderPicks() {
+  const key = race.bench;
+  const { best, value, open } = pickModels(key);
+  setHTML('#picks', pickCard('best', best, key, best) + pickCard('value', value, key, best) + pickCard('open', open, key, best));
+  const b = data.progress.race.benches[key];
+  const about = data.progress.benchmarks.find((x) => x.name === b.name);
+  const t = USES[key].task;
+  const stale = b.latest && Date.now() - Date.parse(b.latest) > 120 * DAY ? ` <b>Lưu ý:</b> bài này chưa chấm model nào mới từ ${fmtDate(b.latest)}, nên có thể thiếu model mới.` : '';
+  setHTML(
+    '#race-about',
+    `<b>Chấm thế nào:</b> ${esc(about?.desc ?? '')} (${esc(b.name)}, ${b.tested} model, mới nhất ${fmtDate(b.latest)}).${stale}
+    <br><b>Chi phí ước tính:</b> giả định ${t.what} cần khoảng ${fmtTokens(t.in)} token đọc và ${fmtTokens(t.out)} token viết, theo giá niêm yết; việc thật có thể tốn hơn hoặc ít hơn vài lần.`,
+  );
+}
+
+function renderProfileSelect() {
+  const groups = new Map();
+  for (const m of [...data.progress.race.models].sort((a, c) => a.name.localeCompare(c.name))) {
+    const g = m.open ? 'Mã nguồn mở' : m.org || 'Khác';
+    groups.set(g, [...(groups.get(g) ?? []), m]);
+  }
+  const order = (g) => ['Anthropic', 'OpenAI', 'Google DeepMind', 'Mã nguồn mở'].indexOf(g) + 1 || 9;
+  $('#profile-select').innerHTML = [...groups]
+    .sort((a, c) => order(a[0]) - order(c[0]) || a[0].localeCompare(c[0]))
+    .map(([g, ms]) => `<optgroup label="${esc(g)}">${ms.map((m) => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('')}</optgroup>`)
+    .join('');
+}
+
+function renderProfile() {
+  if (profileAuto || !modelById(profileId)) profileId = pickModels(race.bench).best?.id ?? null;
+  const m = modelById(profileId);
+  if (!m) return setHTML('#profile', '<p class="empty">Chưa có dữ liệu.</p>');
+  $('#profile-select').value = m.id;
+  const rows = USE_KEYS.map((k) => {
+    const st = standing(k, m);
+    if (!st) {
+      return `<div class="prof-row none"><span class="prof-use">${icon(USES[k].icon)}${USES[k].title}</span><span class="meter"></span><span class="tier">Chưa được chấm</span></div>`;
+    }
+    return `<div class="prof-row${k === race.bench ? ' current' : ''}">
+      <span class="prof-use">${icon(USES[k].icon)}${USES[k].title}</span>
+      <span class="meter" title="Mạnh hơn ${Math.round(st.share * 100)}% model được chấm"><i style="width:${Math.max(4, Math.round(st.share * 100))}%"></i></span>
+      <span class="tier ${st.cls}">${st.label}</span>
+      <small class="prof-detail">Hạng ${st.rank}/${st.n} · ${plainScore(k, m.scores[k].v, st.top)}</small>
+    </div>`;
+  }).join('');
+
+  const price = priceStanding(m);
+  const good = [];
+  const bad = [];
+  for (const k of USE_KEYS) {
+    const st = standing(k, m);
+    if (st?.cls === 't1' || st?.cls === 't2') good.push(USES[k].title);
+    if (st?.cls === 't4') bad.push(USES[k].title);
+  }
+  if (price && price.p < 0.4) good.push('Tính năng AI gọi nhiều lần, khối lượng lớn (vì rẻ)');
+  if (m.open) good.push('Chạy trên máy chủ riêng khi dữ liệu không được gửi ra ngoài');
+  if (m.context >= 1e6) good.push('Đọc cả dự án hoặc tài liệu rất dài trong một lần');
+  if (price && price.p >= 0.8) bad.push('Việc đơn giản, số lượng lớn: tốn tiền, nên dùng model rẻ hơn');
+  if (m.context && m.context < 200000) bad.push('Tài liệu hoặc dự án lớn: đọc được ít chữ mỗi lần');
+  const list = (xs) => (xs.length ? `<ul>${xs.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="hint">Chưa đủ dữ liệu để kết luận.</p>');
+
+  setHTML(
+    '#profile',
+    `<div class="prof-head">
+      <div><h3>${esc(m.name)}</h3>
+      <div class="prof-meta">${esc(m.org)} · ${m.open ? 'Mã nguồn mở: tự cài được hoặc thuê qua API' : 'Mã nguồn đóng: chỉ dùng qua API của hãng'} · ra mắt ${fmtDate(m.date)}</div></div>
+      ${m.url ? `<a class="more" href="${safeUrl(m.url)}" target="_blank" rel="noopener">Giá, nơi dùng thử ${icon('external')}</a>` : ''}
+    </div>
+    <div class="prof-rows">${rows}</div>
+    <div class="prof-facts">
+      <div><span>Giá</span><b>${m.blend != null ? `${fmtPrice(m.priceIn)} đọc · ${fmtPrice(m.priceOut)} viết` : 'Chưa có trên OpenRouter'}</b>${price ? `<small>${price.label}: ${price.text}</small>` : ''}</div>
+      <div><span>Đọc một lần được</span><b>${m.context ? `${fmtCtx(m.context)} token` : 'Chưa rõ'}</b>${m.context ? `<small>khoảng ${nf0.format(Math.round(m.context / 667 / 50) * 50)} trang sách</small>` : ''}</div>
+    </div>
+    <div class="prof-verdict">
+      <div class="yes"><h4>${icon('spark')}Nên dùng cho</h4>${list(good)}</div>
+      <div class="no"><h4>${icon('x')}Không nên dùng cho</h4>${list(bad)}</div>
+    </div>`,
+  );
+}
+
+function openProfile(id) {
+  if (!modelById(id)) return;
+  profileId = id;
+  profileAuto = false;
+  renderProfile();
+  $('.profile-panel').scrollIntoView({ block: 'start' });
+}
+
 const LB_COLS = [
-  { key: 'web', label: 'Làm web' },
-  { key: 'code', label: 'Lập trình' },
+  { key: 'web', label: 'Giao diện web' },
+  { key: 'code', label: 'Code' },
   { key: 'terminal', label: 'Terminal' },
+  { key: 'facts', label: 'Chatbot' },
   { key: 'price', label: 'Giá vào / ra', dir: 1 },
   { key: 'context', label: 'Ngữ cảnh' },
   { key: 'date', label: 'Ra mắt' },
@@ -679,11 +892,11 @@ function renderLeaderboard() {
         const s = m.scores[k];
         return `<td class="num${k === key ? ' on' : ''}">${s ? shortScore(R.benches[k].kind, s.v) : '<span class="none">–</span>'}</td>`;
       };
-      const name = m.url ? link(m.url, esc(m.name)) : esc(m.name);
+      const name = `<button type="button" class="lb-name" data-model="${esc(m.id)}">${esc(m.name)}</button>`;
       return `<tr>
         <td class="rank">${i + 1}</td>
         <td class="model">${name}<small>${esc(m.org)}${m.open ? ' · <span class="open-tag"><i class="sw s-open"></i>mở</span>' : ''}</small></td>
-        ${score('web')}${score('code')}${score('terminal')}
+        ${score('web')}${score('code')}${score('terminal')}${score('facts')}
         <td class="num${key === 'price' ? ' on' : ''}">${m.blend != null ? `${nfPrice.format(m.priceIn)} / ${nfPrice.format(m.priceOut)} $` : '<span class="none">chưa có giá</span>'}</td>
         <td class="num${key === 'context' ? ' on' : ''}">${m.context ? fmtCtx(m.context) : '<span class="none">–</span>'}</td>
         <td class="num${key === 'date' ? ' on' : ''}">${fmtDate(m.date)}</td>
@@ -708,13 +921,14 @@ function renderRaceCharts() {
 function renderRace() {
   const R = data.progress?.race;
   if (!R) {
-    for (const sel of ['#value-chart', '#race-chart', '#gap', '#leaderboard']) setHTML(sel, '<p class="empty">Chưa có dữ liệu cuộc đua, thử bấm “Làm mới”.</p>');
+    for (const sel of ['#picks', '#profile', '#value-chart', '#race-chart', '#gap', '#leaderboard']) setHTML(sel, '<p class="empty">Chưa có dữ liệu cuộc đua, thử bấm “Làm mới”.</p>');
     return;
   }
   for (const btn of $$('#race-bench [data-bench]')) btn.setAttribute('aria-pressed', btn.dataset.bench === race.bench);
   const b = R.benches[race.bench];
-  const about = data.progress.benchmarks.find((x) => x.name === b.name);
-  setHTML('#race-about', `<b>${esc(b.title)}</b> (${esc(b.name)}): ${esc(about?.desc ?? '')} ${b.tested} model đã được chấm, mới nhất ngày ${fmtDate(b.latest)}.`);
+  renderPicks();
+  renderProfileSelect();
+  renderProfile();
   setHTML('#value-legend', legendItem('s-closed', 'Mã nguồn đóng') + legendItem('s-open', 'Mã nguồn mở'));
   setHTML('#race-legend', LABS.filter((l) => b.series[l.id]?.length).map((l) => legendItem(`s-${l.id}`, l.name, true)).join(''));
   renderRaceCharts();
@@ -729,6 +943,17 @@ function initRace() {
     Object.assign(race, { bench: btn.dataset.bench, sort: null, dir: -1 });
     renderRace();
   });
+  $('#profile-select').addEventListener('change', (e) => {
+    profileId = e.target.value;
+    profileAuto = false;
+    if (data.progress?.race) renderProfile();
+  });
+  for (const sel of ['#picks', '#leaderboard']) {
+    $(sel).addEventListener('click', (e) => {
+      const b = e.target.closest('[data-model]');
+      if (b && data.progress?.race) openProfile(b.dataset.model);
+    });
+  }
   const chart = $('#value-chart');
   const valueHover = (e) => {
     const hit = e.target.closest('.hit');
