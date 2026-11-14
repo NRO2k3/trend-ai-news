@@ -10,7 +10,7 @@ const DAY = 86400e3;
 const REFRESH_MS = 15 * 60e3;
 
 const TABS = ['tong-quan', 'tin-tuc', 'repo', 'cong-nghe', 'y-tuong', 'nghien-cuu', 'ky-luc'];
-const CATS = { all: 'Tất cả', lab: 'Công ty AI', media: 'Báo nước ngoài', research: 'Nghiên cứu', community: 'Blog & diễn đàn', vn: 'Báo Việt' };
+const CATS = { all: 'Tất cả', lab: 'Công ty AI', dev: 'Nền tảng dev', media: 'Báo công nghệ', research: 'Kỹ thuật', community: 'Blog & diễn đàn' };
 const RANGES = { 1: '24 giờ qua', 3: '3 ngày qua', 7: '7 ngày qua', 30: '30 ngày qua' };
 const PROVIDERS = {
   google: 'Google', openai: 'OpenAI', anthropic: 'Anthropic', meta: 'Meta', 'meta-llama': 'Meta', mistralai: 'Mistral',
@@ -78,6 +78,7 @@ function modelName(raw) {
 const effortOf = (raw) => EFFORT[raw.split('_')[1]] ?? '';
 
 function fmtScore(kind, v) {
+  if (kind === 'elo') return `${nf0.format(Math.round(v))} điểm`;
   if (kind === 'minutes') return v >= 60 ? `${nf1.format(v / 60)} giờ` : `${nf1.format(v)} phút`;
   return `${nf1.format(v * 100)}%`;
 }
@@ -268,12 +269,14 @@ function sparkGeometry(b) {
   const t0 = pts[0].t;
   const t1 = Date.now();
   const log = b.kind === 'minutes';
+  // Percentages sit on a fixed 0–100% axis; open-ended scores span their own range.
+  const fixed = b.kind === 'pct';
   const f = (v) => (log ? Math.log10(v) : v);
-  const lo = log ? f(pts[0].v) : 0;
-  const hi = log ? f(Math.max(...pts.map((p) => p.v))) : 1;
+  const lo = fixed ? 0 : f(pts[0].v);
+  const hi = fixed ? 1 : f(Math.max(...pts.map((p) => p.v)));
   const x = (t) => P + ((t - t0) / (t1 - t0 || 1)) * (W - 2 * P);
   const y = (v) => H - P - ((f(v) - lo) / (hi - lo || 1)) * (H - 2 * P);
-  return { pts: pts.map((p) => ({ ...p, x: x(p.t), y: y(p.v) })), xEnd: x(t1), base: H - P, top: y(log ? pts.at(-1).v : 1) };
+  return { pts: pts.map((p) => ({ ...p, x: x(p.t), y: y(p.v) })), xEnd: x(t1), base: H - P, top: y(fixed ? 1 : pts.at(-1).v) };
 }
 
 function sparkline(b, i) {
@@ -307,7 +310,9 @@ function renderProgress(progress) {
           const change =
             b.kind === 'minutes'
               ? `<b>gấp ${nf1.format(L.score / b.yearAgo.score)} lần</b>`
-              : `<b>tăng ${nf1.format((L.score - b.yearAgo.score) * 100)} điểm</b>`;
+              : b.kind === 'elo'
+                ? `<b>tăng ${nf0.format(Math.round(L.score - b.yearAgo.score))} điểm</b>`
+                : `<b>tăng ${nf1.format((L.score - b.yearAgo.score) * 100)} điểm</b>`;
           delta = `1 năm trước chỉ ${fmtScore(b.kind, b.yearAgo.score)} → ${change}`;
         }
         const rows = b.top
@@ -720,10 +725,13 @@ const PROMPTS = [
   'Phóng to: có 1 triệu người dùng thì dữ liệu thu được mở ra sản phẩm gì tiếp theo?',
   'Đổi người dùng: ai khác cũng gặp đúng nỗi đau này nhưng sẵn sàng trả tiền hơn?',
   'Kết hợp: gộp thêm một bài toán liên kết vào cùng sản phẩm có làm nó mạnh hơn không?',
-  'Kênh: người dùng đang ở sẵn đâu (Zalo, Facebook, cuộc gọi điện thoại)? Chạy ngay ở đó được không?',
   'Rủi ro: nếu AI sai một lần thì hậu quả là gì, và ai kiểm tra lại?',
   'Dữ liệu: dữ liệu để làm thử lấy ở đâu? Ai đang giữ mà chưa dùng tới?',
   'Vì sao chưa ai làm: rào cản thật sự là công nghệ, luật, hay thói quen?',
+  'Chỗ đứng: chạy trong IDE, CLI, trình duyệt hay CI? Dev đang mở sẵn cái nào cả ngày?',
+  'Mã nguồn mở trước để có người dùng, rồi bán bản cho đội và doanh nghiệp (tự cài, đăng nhập SSO, hỗ trợ)?',
+  'Đo được không: tiết kiệm bao nhiêu giờ dev mỗi tuần? Con số đó là lý do để sếp trả tiền.',
+  'Làm thành MCP server hoặc skill cho Claude Code, Cursor dùng, thay vì một app riêng?',
 ];
 
 const idea = { problem: null, techs: [], scores: {}, note: '', entryId: null };
@@ -740,7 +748,8 @@ function hashStr(s) {
   return Math.abs(h);
 }
 
-const allProblems = () => [...(data.ideas?.problems ?? []), ...myProblems];
+// Problems saved by an earlier version may use bottlenecks that no longer exist.
+const allProblems = () => [...(data.ideas?.problems ?? []), ...myProblems.filter((p) => p.nodes.some((n) => nodeOf(n)))];
 const problemOf = (id) => allProblems().find((p) => p.id === id);
 const techOf = (id) => data.ideas.techs.find((t) => t.id === id);
 const nodeOf = (id) => data.ideas.nodes.find((n) => n.id === id);
@@ -1043,9 +1052,7 @@ function renderIdeas(res, force = false) {
   data.ideas = res;
   if (idea.problem && !problemOf(idea.problem)) Object.assign(idea, { problem: null, techs: [], scores: {}, note: '', entryId: null });
   idea.techs = idea.techs.filter((id) => techOf(id));
-  if (!$('#my-nodes')?.children.length) {
-    setHTML('#my-nodes', res.nodes.map((n) => `<label class="chip check"><input type="checkbox" name="node" value="${n.id}">${esc(n.name)}</label>`).join(''));
-  }
+  setHTML('#my-nodes', res.nodes.map((n) => `<label class="chip check"><input type="checkbox" name="node" value="${n.id}">${esc(n.name)}</label>`).join(''));
   renderSparks();
   renderComposer();
   renderNodes();

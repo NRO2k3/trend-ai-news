@@ -1,6 +1,6 @@
 # Xu hướng AI
 
-Trang tin AI thế giới bằng tiếng Việt: tin tức, repo GitHub đang hot, công nghệ và công cụ AI đang được dùng nhiều, nghiên cứu nổi bật và kỷ lục AI. Không cần cài thư viện, chỉ cần Node.js 20 trở lên.
+Trang tin AI bằng tiếng Việt **dành cho dev web**: tin tức, repo GitHub đang hot, công nghệ và công cụ AI dùng được khi làm web, nghiên cứu về code/agent, kỷ lục AI lập trình, và phòng ý tưởng. Thứ gì dev web biết cũng không để làm gì (gọi vốn, kiện tụng, chính trị, chip, robot, tạo ảnh/video, toán học…) đều bị lọc bỏ. Không cần cài thư viện, chỉ cần Node.js 20 trở lên.
 
 ```bash
 npm start
@@ -14,24 +14,26 @@ Trang chia thành các tab; tab **Tổng quan** tóm tắt mỗi phần vài dò
 
 | Tab | Nội dung | Nguồn dữ liệu |
 |---|---|---|
-| Tin tức | Tin nóng (một sự kiện nhiều báo đưa thì gom thành một cụm), tất cả tin có bộ lọc, công ty/chủ đề được nói tới nhiều | RSS của 16 nguồn bên dưới |
+| Tin tức | Tin nóng (một sự kiện nhiều báo đưa thì gom thành một cụm), tất cả tin có bộ lọc, công ty/chủ đề được nói tới nhiều | RSS của 14 nguồn bên dưới, bỏ tin rác theo tiêu đề (`JUNK` trong `lib/news.js`) |
 | Repo hot | Repo AI hot tuần này; repo AI mới tạo tăng sao nhanh trong 30 ngày | [GitHub Trending](https://github.com/trending), GitHub Search API |
 | Công nghệ & công cụ | 19 công nghệ (AI Agent, MCP, RAG…) kèm giải thích và số lần được nhắc; mô hình mới; mô hình mở và ứng dụng đang hot | tính từ các nguồn khác, [OpenRouter](https://openrouter.ai/models), [Hugging Face](https://huggingface.co) |
-| Ý tưởng | Tia lửa hôm nay (thứ đang hot ghép với một bài toán thật); bàn ghép bài toán × công nghệ; bản đồ nút thắt chung nối các bài toán; tự chấm điểm và sổ ý tưởng (lưu trong trình duyệt) | 19 bài toán và 10 nút thắt trong `lib/problems.js`, ghép với dữ liệu các tab khác |
+| Ý tưởng | Dành cho dev web: 19 bài toán thật của nghề web. Tia lửa hôm nay (thứ đang hot ghép với một bài toán thật); bàn ghép bài toán × công nghệ; bản đồ nút thắt chung nối các bài toán; tự chấm điểm và sổ ý tưởng (lưu trong trình duyệt) | Bài toán và nút thắt trong `lib/problems.js`, ghép với dữ liệu các tab khác |
 | Nghiên cứu | Paper được thích nhiều nhất | [Hugging Face Papers](https://huggingface.co/papers) |
-| AI giỏi tới đâu | Kỷ lục trên GPQA, FrontierMath, SWE-bench, Terminal-Bench, METR | [Epoch AI](https://epoch.ai/benchmarks) |
+| AI giỏi tới đâu | Kỷ lục làm web và lập trình: WebDev Arena, CursorBench, SWE-bench Verified, Terminal-Bench, METR | [Epoch AI](https://epoch.ai/benchmarks) |
 
 Tiêu đề, tóm tắt và mô tả tiếng Anh được dịch sang tiếng Việt bằng Google Dịch lúc lấy dữ liệu (`lib/translate.js`); nút "Bản gốc" chuyển về tiếng Anh. Danh sách công nghệ và lời giải thích nằm trong `lib/tech.js`.
 
-Tab **Ý tưởng** nối các bài toán với nhau qua *nút thắt chung* (ví dụ "Giấy tờ, nhập liệu bằng tay" gặp ở cả hành chính công, bệnh án, sổ sách hộ kinh doanh, truy xuất nông sản): chọn một bài toán và 1–2 công nghệ sẽ thấy nút thắt nào được gỡ, bài toán nào khác dùng chung được lời giải, công nghệ đó đang được nhắc nhiều cỡ nào, và repo/mô hình có sẵn để làm thử. Thêm bài toán hoặc nút thắt mới trong `lib/problems.js`; người dùng cũng tự thêm bài toán của mình ngay trên trang.
+Tab **Ý tưởng** nối các bài toán của nghề web với nhau qua *nút thắt chung*, ví dụ "Kiểm thử, xác minh tốn công" gặp ở cả test E2E, review PR, nâng cấp thư viện, kiểm tra a11y và hiệu năng: chọn một bài toán và 1–2 công nghệ sẽ thấy nút thắt nào được gỡ, bài toán nào khác dùng chung được lời giải, công nghệ đó đang được nhắc nhiều cỡ nào, và repo/mô hình có sẵn để làm thử. Thêm bài toán hoặc nút thắt mới trong `lib/problems.js`; người dùng cũng tự thêm bài toán của mình ngay trên trang.
 
 Nguồn tin (sửa trong `lib/news.js`, mảng `SOURCES`):
 
-- Phòng lab: OpenAI, Google DeepMind, Google AI, Hugging Face, NVIDIA
-- Báo chí: TechCrunch, The Verge, MIT Technology Review, Ars Technica, Wired, The Decoder
-- Nghiên cứu: MarkTechPost, Import AI
+- Công ty AI: OpenAI, Google DeepMind, Google AI, Hugging Face
+- Nền tảng dev (chỉ bài về AI): GitHub Blog, Cloudflare, Vercel
+- Báo công nghệ: TechCrunch, The Verge, Ars Technica, The Decoder
+- Kỹ thuật: MarkTechPost
 - Cộng đồng: Hacker News (bài về AI từ 80 điểm), Simon Willison
-- Việt Nam: VnExpress Số hóa (lọc bài liên quan AI)
+
+Repo, paper và mô hình/ứng dụng Hugging Face cũng được lọc cho dev web (`NOT_DEV`/`DEV_TASKS` trong `lib/repos.js`, `lib/papers.js`, `lib/tools.js`).
 
 ## Cấu trúc
 
