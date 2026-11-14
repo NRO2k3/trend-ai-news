@@ -346,7 +346,7 @@ function renderProgress(progress) {
           ${delta ? `<div class="delta">${delta}</div>` : ''}
           ${sparkline(b, i)}
           <div class="axis"><span>${new Date(b.record[0].date).getFullYear()}</span><span>hiện nay</span></div>
-          <details><summary>Xem 5 mô hình đứng đầu (trong ${b.evaluated} mô hình đã thử)</summary><table>${rows}</table></details>
+          <details><summary>5 mô hình dẫn đầu · ${b.evaluated} mô hình đã thử ${icon('chevron')}</summary><table>${rows}</table></details>
         </article>`;
       })
       .join(''),
@@ -399,15 +399,21 @@ function metaRow(it, extra = '') {
   return `<div class="meta"><span class="src">${esc(it.sourceName)}</span><span class="sep"></span><time datetime="${it.date}" title="${new Date(it.date).toLocaleString('vi-VN')}">${ago(it.date)}</time>${extra}</div>`;
 }
 
+// The busiest stories first; the rest wait behind a button so the latest news stays close.
+const HOT_FIRST = 3;
+let showAllHot = false;
+
 function renderHot() {
   const news = data.news;
   if (!news.hot.length) {
     setHTML('#hot', '<p class="empty">Chưa có sự kiện nào được nhiều báo cùng đưa trong vài ngày qua.</p>');
     return;
   }
+  const rest = news.hot.length - HOT_FIRST;
   setHTML(
     '#hot',
     news.hot
+      .slice(0, showAllHot ? undefined : HOT_FIRST)
       .map((c) => {
         const it = c.lead;
         const related = c.related
@@ -425,7 +431,8 @@ function renderHot() {
           ${thumb(it.image)}
         </article>`;
       })
-      .join(''),
+      .join('') +
+      (rest > 0 ? `<button class="btn wide" type="button" id="toggle-hot">${showAllHot ? 'Thu gọn' : `Xem thêm ${rest} sự kiện nhiều báo cùng đưa`}</button>` : ''),
   );
 }
 
@@ -833,13 +840,14 @@ function sparkCard(s, i, compact = false) {
     </a>`;
   }
   const desc = tx(it, 'desc');
+  const surprise = s.strong ? '' : '<span class="tag surprise" title="Ghép cố ý với một bài toán ở xa để ra ý tưởng lạ">Bất ngờ</span>';
   return `<article class="spark-card">
-    <div class="meta">${kindTag(it.k)}<span class="sep"></span><span>${esc(it.note)}</span><span class="tag">${s.strong ? 'Đúng chủ đề' : 'Kết nối bất ngờ'}</span></div>
+    <div class="meta">${kindTag(it.k)}<span class="sep"></span><span>${esc(it.note)}</span>${surprise}</div>
     ${link(it.url, esc(tx(it, 'title')), it.k === 'repo' ? 'spark-src' : 'spark-src plain')}
     ${desc ? `<p class="spark-desc">${esc(desc)}</p>` : ''}
-    <div class="spark-problem">${icon('arrow')}${esc(p.title)}</div>
+    <div class="spark-for"><span>Bài toán</span>${esc(p.title)}</div>
     <p class="spark-q">${esc(q)}</p>
-    <button class="linkbtn" type="button" data-spark="${i}">Phát triển ý tưởng này ${icon('arrow')}</button>
+    <button class="btn spark-go" type="button" data-spark="${i}">Phát triển ý tưởng này ${icon('arrow')}</button>
   </article>`;
 }
 
@@ -849,14 +857,25 @@ function renderSparks() {
   setHTML('#ov-sparks', sparks.length ? sparks.slice(0, 3).map((s, i) => sparkCard(s, i, true)).join('') : '<p class="empty">Hôm nay chưa ghép được tia lửa nào.</p>');
 }
 
-function renderProblemPicker() {
-  const q = fold(problemQuery.trim());
-  const list = allProblems().filter((p) => !q || fold(`${p.title} ${p.area} ${p.who ?? ''}`).includes(q));
+function byArea(list) {
   const groups = new Map();
   for (const p of list) {
     const area = p.mine ? 'Của bạn' : p.area;
     groups.set(area, [...(groups.get(area) ?? []), p]);
   }
+  return groups;
+}
+
+function renderProblemPicker() {
+  const q = fold(problemQuery.trim());
+  const list = allProblems().filter((p) => !q || fold(`${p.title} ${p.area} ${p.who ?? ''}`).includes(q));
+  const groups = byArea(list);
+  // Phones get a native dropdown instead of the long list.
+  $('#problem-select').innerHTML =
+    `<option value="">Chọn một bài toán…</option>` +
+    [...byArea(allProblems())]
+      .map(([area, ps]) => `<optgroup label="${esc(area)}">${ps.map((p) => `<option value="${esc(p.id)}"${idea.problem === p.id ? ' selected' : ''}>${esc(p.title)}</option>`).join('')}</optgroup>`)
+      .join('');
   setHTML(
     '#problem-picker',
     list.length
@@ -872,29 +891,32 @@ function renderTechPicker() {
   const p = problemOf(idea.problem);
   const chip = (t) =>
     `<button type="button" class="chip" data-tech="${t.id}" aria-pressed="${idea.techs.includes(t.id)}" title="${esc(t.what)}">${esc(t.name)}<span class="n" title="lượt nhắc tuần này">${t.total}</span></button>`;
-  let groups = [['Xếp theo số lượt được nhắc tuần này', techs]];
-  if (p) {
-    const key = new Set(p.key ?? []);
-    const ease = easing(p);
-    groups = [
-      ['★ Hợp nhất với bài toán này', techs.filter((t) => key.has(t.id))],
-      ['Cũng gỡ được nút thắt của nó', techs.filter((t) => !key.has(t.id) && ease.has(t.id))],
-      ['Bước nhảy xa: thử nếu muốn ý tưởng lạ', techs.filter((t) => !key.has(t.id) && !ease.has(t.id))],
-    ];
+  const chips = (list) => `<div class="chips">${list.map(chip).join('')}</div>`;
+  if (!p) {
+    setHTML('#tech-picker', `<div class="pick-label">Xếp theo số lượt được nhắc tuần này</div>${chips(techs)}`);
+    return;
   }
+  const key = new Set(p.key ?? []);
+  const ease = easing(p);
+  const far = techs.filter((t) => !key.has(t.id) && !ease.has(t.id));
+  const open = $('#tech-picker .far')?.open || far.some((t) => idea.techs.includes(t.id));
   setHTML(
     '#tech-picker',
-    groups
+    [
+      ['★ Hợp nhất với bài toán này', techs.filter((t) => key.has(t.id))],
+      ['Cũng gỡ được nút thắt của nó', techs.filter((t) => !key.has(t.id) && ease.has(t.id))],
+    ]
       .filter(([, list]) => list.length)
-      .map(([title, list]) => `<div class="pick-label">${title}</div><div class="chips">${list.map(chip).join('')}</div>`)
-      .join(''),
+      .map(([title, list]) => `<div class="pick-label">${title}</div>${chips(list)}`)
+      .join('') +
+      (far.length ? `<details class="far"${open ? ' open' : ''}><summary>Bước nhảy xa: ${far.length} công nghệ khác, cho ý tưởng lạ ${icon('chevron')}</summary>${chips(far)}</details>` : ''),
   );
 }
 
 function renderIdeaCard() {
   const p = problemOf(idea.problem);
   if (!p) {
-    setHTML('#idea-card', `<div class="idea-empty">${icon('bulb')}<p>Chọn một bài toán và một công nghệ ở bên trái, hoặc bấm <b>Ngẫu nhiên</b>, để thấy ý tưởng nháp ở đây.</p></div>`);
+    setHTML('#idea-card', `<div class="idea-empty">${icon('bulb')}<p>Chọn một bài toán, hoặc bấm <b>Ngẫu nhiên</b>, để thấy ý tưởng nháp ở đây.</p><button class="linkbtn" type="button" data-view="sparks">Chưa có ý? Xem tia lửa hôm nay ${icon('arrow')}</button></div>`);
     return;
   }
   const facts = `<dl class="facts">
@@ -1099,7 +1121,7 @@ function renderIdeas(res, force = false) {
   renderBook();
 }
 
-// The ideas tab has three views: composer, bottleneck map, notebook.
+// The ideas tab has four views: today's sparks, composer, bottleneck map, notebook.
 function setIdeaView(view) {
   for (const b of $$('#idea-view [data-view]')) b.setAttribute('aria-pressed', b.dataset.view === view);
   for (const pane of $$('[data-view-pane]')) pane.hidden = pane.dataset.viewPane !== view;
@@ -1108,6 +1130,22 @@ function setIdeaView(view) {
 function pickIdea(next) {
   Object.assign(idea, { scores: {}, note: '', entryId: null }, next);
   renderComposer();
+}
+
+// Picking a problem shows a draft straight away: keep the chosen technologies
+// if they still ease it, otherwise start from its best fit that people talk
+// about most this week. The reader swaps it in step 2.
+function chooseProblem(id) {
+  const p = problemOf(id);
+  if (!p) return;
+  const ease = easing(p);
+  let techs = idea.techs.filter((t) => ease.has(t));
+  if (!techs.length) {
+    const pool = p.key?.length ? p.key : [...ease];
+    const best = pool.map(techOf).filter(Boolean).sort((a, b) => b.total - a.total)[0];
+    techs = best ? [best.id] : [];
+  }
+  pickIdea({ problem: id, techs });
 }
 
 function flash(btn, text) {
@@ -1129,7 +1167,7 @@ function ideaAction(t) {
     return;
   }
   if (ds.problem) {
-    pickIdea({ problem: ds.problem });
+    chooseProblem(ds.problem);
   } else if (ds.tech) {
     const techs = idea.techs.includes(ds.tech) ? idea.techs.filter((id) => id !== ds.tech) : [...idea.techs, ds.tech].slice(-2);
     const completes = !idea.techs.length && techs.length && idea.problem;
@@ -1202,6 +1240,9 @@ function initIdeas() {
     if (e.target.id === 'idea-note') idea.note = e.target.value;
     if (e.target.id === 'problem-filter') { problemQuery = e.target.value; renderProblemPicker(); }
   });
+  $('#problem-select').addEventListener('change', (e) => {
+    if (data.ideas && e.target.value) chooseProblem(e.target.value);
+  });
   $('#my-problem-form').addEventListener('submit', (e) => {
     e.preventDefault();
     if (!data.ideas) return;
@@ -1214,7 +1255,7 @@ function initIdeas() {
     remember('myProblems', JSON.stringify(myProblems));
     e.target.reset();
     e.target.closest('details').open = false;
-    pickIdea({ problem: p.id });
+    chooseProblem(p.id);
     renderNodes();
   });
 }
@@ -1298,7 +1339,7 @@ function openPal(it) {
   } else if (it.problem) {
     goTab('y-tuong');
     setIdeaView('compose');
-    pickIdea({ problem: it.problem });
+    chooseProblem(it.problem);
     $('#composer').scrollIntoView({ block: 'start' });
   } else if (it.tab) {
     goTab(it.tab);
@@ -1431,6 +1472,11 @@ function initControls() {
     if (state.days < 7) { state.days = 7; $('#range').value = '7'; }
     rerender();
     $('#river-block').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  $('#hot').addEventListener('click', (e) => {
+    if (e.target.id !== 'toggle-hot' || !data.news) return;
+    showAllHot = !showAllHot;
+    renderHot();
   });
   $('#models').addEventListener('click', (e) => {
     if (e.target.id !== 'toggle-models' || !data.models) return;

@@ -227,22 +227,24 @@
             <p class="lede">Ghép một bài toán thật của nghề web với công nghệ AI vừa đủ chín. Bài toán nối với nhau qua nút thắt chung: gỡ một nút là giải được nhiều bài toán.</p>
           </div>
           <div class="seg" id="idea-view" role="group" aria-label="Phần">
-            <button type="button" data-view="compose" aria-pressed="true"><svg class="i"><use href="#i-spark"/></svg>Ghép ý tưởng</button>
-            <button type="button" data-view="map" aria-pressed="false"><svg class="i"><use href="#i-network"/></svg>Bản đồ nút thắt</button>
+            <button type="button" data-view="sparks" aria-pressed="true"><svg class="i"><use href="#i-spark"/></svg>Tia lửa</button>
+            <button type="button" data-view="compose" aria-pressed="false"><svg class="i"><use href="#i-bulb"/></svg>Tự ghép</button>
+            <button type="button" data-view="map" aria-pressed="false"><svg class="i"><use href="#i-network"/></svg>Nút thắt</button>
             <button type="button" data-view="book" aria-pressed="false"><svg class="i"><use href="#i-bookmark"/></svg>Sổ ý tưởng<em class="count" data-count="book"></em></button>
           </div>
         </header>
 
-        <div data-view-pane="compose">
-          <section>
-            <h2 class="section-title"><svg class="i"><use href="#i-spark"/></svg>Tia lửa hôm nay<span class="hint inline">Thứ đang hot ghép với một bài toán. Cặp “kết nối bất ngờ” là cố ý.</span></h2>
-            <div id="sparks" class="spark-row"><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div></div>
-          </section>
+        <div data-view-pane="sparks">
+          <p class="hint pane-hint">Mỗi ngày ghép thứ đang hot (repo, mô hình, paper) với một bài toán của nghề web. Thẻ <b>Bất ngờ</b> là cặp ở xa nhau, ghép cố ý để ra ý tưởng lạ.</p>
+          <div id="sparks" class="spark-grid"><div class="skeleton tall"></div><div class="skeleton tall"></div><div class="skeleton tall"></div></div>
+        </div>
 
+        <div data-view-pane="compose" hidden>
           <section id="composer" class="composer">
             <div class="pickers panel">
               <div class="step-head"><span class="num">1</span><h3>Bài toán</h3><button class="ghost-btn" type="button" data-act="random"><svg class="i"><use href="#i-shuffle"/></svg>Ngẫu nhiên</button></div>
-              <label class="input-wrap small"><svg class="i"><use href="#i-search"/></svg><input id="problem-filter" type="search" placeholder="Lọc bài toán…" aria-label="Lọc bài toán"></label>
+              <select id="problem-select" class="problem-select" aria-label="Chọn bài toán"></select>
+              <label class="input-wrap small problem-filter"><svg class="i"><use href="#i-search"/></svg><input id="problem-filter" type="search" placeholder="Lọc bài toán…" aria-label="Lọc bài toán"></label>
               <div id="problem-picker" class="pick-list"></div>
               <details class="my-problem">
                 <summary><svg class="i"><use href="#i-plus"/></svg>Thêm bài toán của bạn</summary>
@@ -255,10 +257,12 @@
                   <button class="btn primary" type="submit">Thêm và chọn</button>
                 </form>
               </details>
-              <div class="step-head second"><span class="num">2</span><h3>Công nghệ <small>tối đa 2</small></h3></div>
-              <div id="tech-picker"></div>
             </div>
             <div class="idea-out">
+              <div class="panel tech-panel">
+                <div class="step-head"><span class="num">2</span><h3>Công nghệ <small>chọn tối đa 2</small></h3></div>
+                <div id="tech-picker"></div>
+              </div>
               <div id="idea-card" class="panel idea-card"></div>
               <div id="idea-score" class="panel" hidden></div>
             </div>
@@ -266,12 +270,12 @@
         </div>
 
         <div data-view-pane="map" hidden>
-          <p class="hint">Mỗi nút thắt cản nhiều bài toán cùng lúc. Bấm bài toán hoặc công nghệ để đưa sang bàn ghép.</p>
+          <p class="hint pane-hint">Mỗi nút thắt cản nhiều bài toán cùng lúc. Bấm bài toán hoặc công nghệ để đưa sang phần Tự ghép.</p>
           <div id="nodes" class="node-grid"><div class="skeleton tall"></div><div class="skeleton tall"></div></div>
         </div>
 
         <div data-view-pane="book" id="book-block" hidden>
-          <p class="hint">Lưu ngay trong trình duyệt này, không gửi đi đâu. Tải về để giữ lâu dài.</p>
+          <p class="hint pane-hint">Lưu ngay trong trình duyệt này, không gửi đi đâu. Tải về để giữ lâu dài.</p>
           <div id="book"></div>
         </div>
       </section>
