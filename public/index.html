@@ -33,6 +33,10 @@
       <symbol id="i-trend" viewBox="0 0 24 24"><path d="M22 7 13.5 15.5l-5-5L2 17M16 7h6v6"/></symbol>
       <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></symbol>
       <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></symbol>
+      <symbol id="i-grad" viewBox="0 0 24 24"><path d="M21.4 10.9a1 1 0 0 0 0-1.8l-8.6-3.9a2 2 0 0 0-1.6 0L2.6 9.1a1 1 0 0 0 0 1.8l8.6 3.9a2 2 0 0 0 1.6 0ZM22 10v6M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 4v16l14-8Z"/></symbol>
+      <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
       <symbol id="i-layout" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></symbol>
       <symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
       <symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 17 6-6-6-6M12 19h8"/></symbol>
@@ -65,6 +69,7 @@
       </button>
       <nav class="nav" aria-label="Các mục">
         <a href="#tong-quan" data-tab="tong-quan"><svg class="i"><use href="#i-home"/></svg><span>Tổng quan</span></a>
+        <a href="#hoc-ai" data-tab="hoc-ai"><svg class="i"><use href="#i-grad"/></svg><span>Học AI</span><em class="count" data-count="learn"></em></a>
         <a href="#tin-tuc" data-tab="tin-tuc"><svg class="i"><use href="#i-news"/></svg><span>Tin tức</span><em class="count" data-count="news"></em></a>
         <a href="#repo" data-tab="repo"><svg class="i"><use href="#i-repo"/></svg><span>Repo hot</span><em class="count" data-count="repos"></em></a>
         <a href="#cong-nghe" data-tab="cong-nghe"><svg class="i"><use href="#i-layers"/></svg><span>Công nghệ &amp; công cụ</span></a>
@@ -72,6 +77,12 @@
         <a href="#nghien-cuu" data-tab="nghien-cuu"><svg class="i"><use href="#i-book"/></svg><span>Nghiên cứu</span></a>
         <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg><span>Chọn model AI</span></a>
       </nav>
+      <a class="level-card" href="#hoc-ai" id="level-card">
+        <span class="lv-num" id="lv-num">1</span>
+        <span class="lv-text"><small>Cấp của bạn</small><b id="lv-title">Người mới</b></span>
+        <span class="lv-bar"><i id="lv-fill"></i></span>
+        <small class="lv-sub" id="lv-sub">0/20 bài</small>
+      </a>
       <div class="sidebar-foot">
         <div class="status"><span class="live"></span><span id="updated">Đang tải…</span></div>
         <div class="foot-actions">
@@ -102,6 +113,7 @@
             <h1>Hôm nay AI có gì mới cho dev web</h1>
           </div>
         </header>
+        <div id="learn-banner"></div>
         <div class="kpis" id="pulse"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
         <div class="ov-grid">
           <div class="ov-col">
@@ -133,6 +145,18 @@
           <div class="panel-head"><h2><svg class="i"><use href="#i-trophy"/></svg>AI code giỏi tới đâu rồi</h2><a class="more" href="#ky-luc">Chọn model AI<svg class="i"><use href="#i-arrow"/></svg></a></div>
           <div id="ov-bench" class="ov-bench"><div class="skeleton"></div></div>
         </section>
+      </section>
+
+      <!-- Học AI -->
+      <section class="page" data-page="hoc-ai" hidden>
+        <header class="page-head">
+          <div>
+            <h1>Học AI cho dev web</h1>
+            <p class="lede">5 cấp, từ người mới tới người tạo ra sản phẩm AI. Mỗi bài 2–3 phút: đọc, bấm <b>Thử ngay</b> để thấy điều đó ngay trên trang, rồi trả lời một câu hỏi là qua bài. Tiến độ lưu trong trình duyệt này.</p>
+          </div>
+        </header>
+        <section class="learn-hero" id="learn-hero"></section>
+        <div class="levels" id="levels"></div>
       </section>
 
       <!-- Tin tức -->
@@ -380,8 +404,8 @@
 
     <nav class="bottombar" aria-label="Các mục">
       <a href="#tong-quan" data-tab="tong-quan"><svg class="i"><use href="#i-home"/></svg><span>Tổng quan</span></a>
+      <a href="#hoc-ai" data-tab="hoc-ai"><svg class="i"><use href="#i-grad"/></svg><span>Học AI</span></a>
       <a href="#tin-tuc" data-tab="tin-tuc"><svg class="i"><use href="#i-news"/></svg><span>Tin tức</span></a>
-      <a href="#repo" data-tab="repo"><svg class="i"><use href="#i-repo"/></svg><span>Repo</span></a>
       <a href="#y-tuong" data-tab="y-tuong"><svg class="i"><use href="#i-bulb"/></svg><span>Ý tưởng</span></a>
       <button type="button" id="more-btn" aria-haspopup="dialog"><svg class="i"><use href="#i-more"/></svg><span>Thêm</span></button>
     </nav>
@@ -390,6 +414,7 @@
   <!-- Mobile: remaining sections and settings -->
   <div class="sheet" id="more-sheet" hidden>
     <div class="sheet-card" role="dialog" aria-label="Thêm">
+      <a href="#repo" data-tab="repo"><svg class="i"><use href="#i-repo"/></svg>Repo hot</a>
       <a href="#cong-nghe" data-tab="cong-nghe"><svg class="i"><use href="#i-layers"/></svg>Công nghệ &amp; công cụ</a>
       <a href="#nghien-cuu" data-tab="nghien-cuu"><svg class="i"><use href="#i-book"/></svg>Nghiên cứu</a>
       <a href="#ky-luc" data-tab="ky-luc"><svg class="i"><use href="#i-trophy"/></svg>Chọn model AI</a>
@@ -408,6 +433,9 @@
   </div>
 
   <div id="tip" class="tip" role="tooltip" hidden></div>
+  <div id="term-pop" class="term-pop" role="tooltip" hidden></div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="learn.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

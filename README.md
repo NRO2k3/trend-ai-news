@@ -14,6 +14,7 @@ Thanh bên trái (trên điện thoại là thanh dưới cùng) chuyển giữa
 
 | Tab | Nội dung | Nguồn dữ liệu |
 |---|---|---|
+| Học AI | Lộ trình 5 cấp cho dev web (20 bài, mỗi bài 2–3 phút): đọc, “Thử ngay” trên trang, trả lời câu hỏi để qua bài, lên cấp; huy hiệu cấp ở thanh bên. Từ khó (agent, MCP, RAG, token…) trong tin, repo, mô hình được gạch chân, rê hoặc chạm để xem giải thích | nội dung trong `public/learn.js`, tiến độ lưu trong trình duyệt |
 | Tin tức | Tin nóng (một sự kiện nhiều báo đưa thì gom thành một cụm), tất cả tin có bộ lọc, công ty/chủ đề được nói tới nhiều | RSS của 14 nguồn bên dưới, bỏ tin rác theo tiêu đề (`JUNK` trong `lib/news.js`) |
 | Repo hot | Repo AI hot tuần này; repo AI mới tạo tăng sao nhanh trong 30 ngày | [GitHub Trending](https://github.com/trending), GitHub Search API |
 | Công nghệ & công cụ | 19 công nghệ (AI Agent, MCP, RAG…) kèm giải thích và số lần được nhắc; mô hình mới; mô hình mở và ứng dụng đang hot | tính từ các nguồn khác, [OpenRouter](https://openrouter.ai/models), [Hugging Face](https://huggingface.co) |

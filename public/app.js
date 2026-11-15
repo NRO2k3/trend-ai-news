@@ -9,7 +9,7 @@ const nf1 = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 });
 const DAY = 86400e3;
 const REFRESH_MS = 15 * 60e3;
 
-const TABS = ['tong-quan', 'tin-tuc', 'repo', 'cong-nghe', 'y-tuong', 'nghien-cuu', 'ky-luc'];
+const TABS = ['tong-quan', 'hoc-ai', 'tin-tuc', 'repo', 'cong-nghe', 'y-tuong', 'nghien-cuu', 'ky-luc'];
 const CATS = { all: 'Tất cả', lab: 'Công ty AI', dev: 'Nền tảng dev', media: 'Báo công nghệ', research: 'Kỹ thuật', community: 'Blog & diễn đàn' };
 const RANGES = { 1: '24 giờ qua', 3: '3 ngày qua', 7: '7 ngày qua', 30: '30 ngày qua' };
 const PROVIDERS = {
@@ -132,7 +132,7 @@ function route() {
   // On phones "Thêm" stands for the sections that only live in its sheet.
   const more = $('#more-btn');
   if (more) {
-    if (['cong-nghe', 'nghien-cuu', 'ky-luc'].includes(tab)) more.setAttribute('aria-current', 'page');
+    if (['repo', 'cong-nghe', 'nghien-cuu', 'ky-luc'].includes(tab)) more.setAttribute('aria-current', 'page');
     else more.removeAttribute('aria-current');
   }
   closeSheet();
@@ -1043,7 +1043,7 @@ function renderHot() {
           <div class="min0">
             <div class="meta"><span class="dot cat-${it.cat}"></span><span class="src">${esc(it.sourceName)}</span><span class="sep"></span><span>${ago(it.date)}</span><span class="badge">${c.sourceCount} nguồn cùng đưa</span></div>
             ${link(it.url, esc(tx(it, 'title')), 'title')}
-            ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
+            ${summary ? `<p class="sum">${gloss(esc(summary))}</p>` : ''}
             ${related ? `<details class="related"><summary>Các nguồn khác viết gì ${icon('chevron')}</summary><ul>${related}</ul></details>` : ''}
           </div>
           ${thumb(it.image)}
@@ -1116,7 +1116,7 @@ function renderRiver() {
           <span class="src-badge" style="background:var(--cat-${it.cat})" title="${esc(it.sourceName)}">${esc(initials(it.sourceName))}</span>
           <div class="min0">
             ${link(it.url, esc(tx(it, 'title')), 'title')}
-            ${summary ? `<p class="sum">${esc(summary)}</p>` : ''}
+            ${summary ? `<p class="sum">${gloss(esc(summary))}</p>` : ''}
             ${metaRow(it)}
           </div>
           ${thumb(it.image)}
@@ -1229,7 +1229,7 @@ function renderRepos(repos) {
             ${avatar(owner)}
             <div class="min0">
               ${link(r.url, `${esc(owner)}/<b>${esc(name)}</b>`, 'repo-name')}
-              ${r.description ? `<p>${esc(tx(r, 'description'))}</p>` : ''}
+              ${r.description ? `<p>${gloss(esc(tx(r, 'description')))}</p>` : ''}
               <div class="meta">${lang}${rising ? `<span>tạo ${ago(r.created)}</span>` : ''}${topics}</div>
             </div>
             <div class="repo-side">
@@ -1264,7 +1264,7 @@ function renderTech(tech) {
         return `<article class="tech${i < 3 ? ' top' : ''}">
           <div class="tech-head"><h3>${esc(t.name)}</h3><span class="tech-count">${t.total}</span></div>
           <div class="tech-bar"><span style="width:${(t.total / max) * 100}%"></span></div>
-          <p>${esc(t.what)}</p>
+          <p>${gloss(esc(t.what))}</p>
           <div class="meta">${parts.join(' · ')}</div>
           ${examples ? `<div class="tech-ex">Ví dụ: ${examples}</div>` : ''}
           ${headline}
@@ -1293,7 +1293,7 @@ function renderModels(models) {
           return `<div class="mini">
             ${link(m.url, esc(m.name.replace(/^[^:]+:\s*/, '')), 'name')}
             <div class="meta"><span class="src">${esc(providerName(m.provider))}</span><span class="sep"></span><span>ra mắt ${ago(m.created)}</span>${m.free ? '<span class="tag">Miễn phí</span>' : ''}</div>
-            ${desc ? `<p>${esc(desc)}</p>` : ''}
+            ${desc ? `<p>${gloss(esc(desc))}</p>` : ''}
           </div>`;
         })
         .join('') +
@@ -1327,7 +1327,7 @@ function renderTools(tools) {
         return `<div class="mini">
           ${link(s.url, `${s.emoji ? `${esc(s.emoji)} ` : ''}${esc(s.title)}`, 'name')}
           <div class="meta"><span class="src">${esc(s.author)}</span><span class="sep"></span><span>${big(s.likes)} lượt thích</span></div>
-          ${desc ? `<p>${esc(desc)}</p>` : ''}
+          ${desc ? `<p>${gloss(esc(desc))}</p>` : ''}
         </div>`;
       })
       .join(''),
@@ -1349,7 +1349,7 @@ function renderPapers(res) {
               <div class="votes" title="Lượt thích">${p.upvotes}<small>thích</small></div>
               <div class="min0">
                 ${link(p.url, esc(tx(p, 'title')), 'name')}
-                ${summary ? `<p>${esc(summary)}</p>` : ''}
+                ${summary ? `<p>${gloss(esc(summary))}</p>` : ''}
                 <div class="meta">${p.org ? `<span class="src">${esc(p.org)}</span><span class="sep"></span>` : ''}<span>${ago(p.date)}</span></div>
               </div>
             </article>`;
@@ -1878,11 +1878,317 @@ function initIdeas() {
   });
 }
 
+// ---------- learning path ----------
+
+const XP_PER_LESSON = 10;
+let learnDone = new Set();
+let openLessonId = null;
+
+const lessonOf = (id) => LESSONS.find((l) => l.id === id);
+const levelLessons = (n) => LESSONS.filter((l) => l.level === n);
+const levelDone = (n) => levelLessons(n).every((l) => learnDone.has(l.id));
+// The level you are on: the first one not finished yet (5 once everything is done).
+const currentLevel = () => LEVELS.find((lv) => !levelDone(lv.n)) ?? LEVELS.at(-1);
+const nextLesson = () => LESSONS.find((l) => !learnDone.has(l.id)) ?? null;
+
+// Options shuffle per lesson so the right answer isn't always in the same place.
+function quizOrder(l) {
+  return l.quiz.options.map((o, i) => ({ o, i })).sort((a, c) => hashStr(`${l.id}${a.i}`) % 97 - hashStr(`${l.id}${c.i}`) % 97);
+}
+
+function showToast(html) {
+  const t = $('#toast');
+  t.innerHTML = html;
+  t.hidden = false;
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => { t.hidden = true; }, 4200);
+}
+
+function renderLevelBadge() {
+  const lv = currentLevel();
+  const all = LESSONS.length;
+  const done = learnDone.size;
+  const finished = done === all;
+  $('#lv-num').textContent = lv.n;
+  $('#lv-title').textContent = lv.title;
+  $('#lv-sub').textContent = finished ? 'Đã hoàn thành lộ trình' : `${done}/${all} bài · ${done * XP_PER_LESSON} điểm`;
+  $('#lv-fill').style.width = `${Math.round((done / all) * 100)}%`;
+  setCount('learn', finished ? '' : `Cấp ${lv.n}`);
+}
+
+function renderLearnBanner() {
+  const next = nextLesson();
+  if (!next) return setHTML('#learn-banner', '');
+  const fresh = !learnDone.size;
+  const lv = LEVELS[next.level - 1];
+  setHTML(
+    '#learn-banner',
+    `<button type="button" class="learn-banner" data-open-lesson="${next.id}">
+      <span class="lb-icon">${icon('grad')}</span>
+      <span class="lb-text">
+        <b>${fresh ? 'Mới tìm hiểu AI? Bắt đầu từ Cấp 1' : `Học tiếp: ${esc(next.title)}`}</b>
+        <small>${fresh ? `${LESSONS.length} bài ngắn, mỗi bài 2–3 phút, có câu hỏi kiểm tra. Đi hết 5 cấp là tự chọn model, dựng tính năng AI và tìm ý tưởng sản phẩm được.` : `Cấp ${lv.n} · ${esc(lv.title)} · đã xong ${learnDone.size}/${LESSONS.length} bài`}</small>
+      </span>
+      <span class="lb-go">${fresh ? 'Bắt đầu' : 'Học tiếp'} ${icon('arrow')}</span>
+    </button>`,
+  );
+}
+
+function renderLearnHero() {
+  const lv = currentLevel();
+  const next = nextLesson();
+  const done = learnDone.size;
+  const ladder = LEVELS.map((x) => {
+    const d = levelLessons(x.n).filter((l) => learnDone.has(l.id)).length;
+    const state = levelDone(x.n) ? 'done' : x.n === lv.n ? 'here' : 'todo';
+    return `<button type="button" class="rung ${state}" data-level-jump="${x.n}"><span class="rung-num">${state === 'done' ? icon('check') : x.n}</span><span class="rung-text"><b>${esc(x.title)}</b><small>${d}/${levelLessons(x.n).length} bài</small></span></button>`;
+  }).join('');
+  setHTML(
+    '#learn-hero',
+    `<div class="hero-main">
+      <div class="hero-level"><span class="lv-num big">${lv.n}</span><div><small>Cấp hiện tại</small><h2>${esc(lv.title)}</h2><p>${esc(lv.goal)}</p></div></div>
+      <div class="hero-progress"><div class="lv-bar"><i style="width:${Math.round((done / LESSONS.length) * 100)}%"></i></div><span>${done}/${LESSONS.length} bài · ${done * XP_PER_LESSON}/${LESSONS.length * XP_PER_LESSON} điểm</span></div>
+      ${next ? `<button type="button" class="btn primary" data-open-lesson="${next.id}">${icon('play')}${done ? 'Học tiếp' : 'Bắt đầu'}: ${esc(next.title)}</button>` : `<p class="hero-done">${icon('check')}Bạn đã đi hết lộ trình. Giờ thử tự ghép một ý tưởng sản phẩm ở tab Ý tưởng.</p>`}
+    </div>
+    <nav class="ladder" aria-label="Các cấp">${ladder}</nav>`,
+  );
+}
+
+function lessonHTML(l) {
+  const done = learnDone.has(l.id);
+  const opts = quizOrder(l)
+    .map(({ o, i }) => `<button type="button" class="quiz-opt" data-pick="${i}"${done && i === l.quiz.answer ? ' data-state="right"' : ''}>${esc(o)}</button>`)
+    .join('');
+  const idx = LESSONS.indexOf(l);
+  const after = LESSONS[idx + 1];
+  return `<div class="lesson">
+    ${l.body.map((p) => `<p>${p}</p>`).join('')}
+    <div class="lesson-key">${icon('target')}<div><b>Điều cần nhớ</b>${esc(l.key)}</div></div>
+    ${l.try ? `<button type="button" class="btn try-btn" data-try="${l.id}">${icon('play')}Thử ngay: ${esc(l.try.label)}</button>` : ''}
+    ${l.task ? `<p class="lesson-task"><b>Bài tập nhỏ:</b> ${esc(l.task)}</p>` : ''}
+    <div class="quiz" data-quiz="${l.id}">
+      <p class="quiz-q"><span>Câu hỏi</span>${esc(l.quiz.q)}</p>
+      <div class="quiz-opts">${opts}</div>
+      <p class="quiz-why${done ? ' right' : ''}"${done ? '' : ' hidden'}>${done ? `${icon('check')}<span><b>Đúng.</b> ${esc(l.quiz.why)}</span>` : ''}</p>
+    </div>
+    ${after ? `<button type="button" class="linkbtn lesson-next" data-open-lesson="${after.id}"${done ? '' : ' hidden'}>Bài tiếp: ${esc(after.title)} ${icon('arrow')}</button>` : ''}
+  </div>`;
+}
+
+function renderLevels() {
+  setHTML(
+    '#levels',
+    LEVELS.map((lv) => {
+      const list = levelLessons(lv.n);
+      const d = list.filter((l) => learnDone.has(l.id)).length;
+      const rows = list
+        .map((l) => {
+          const open = openLessonId === l.id;
+          const done = learnDone.has(l.id);
+          return `<li class="${open ? 'open' : ''}" id="lesson-${l.id}">
+            <button type="button" class="lesson-row" data-toggle-lesson="${l.id}" aria-expanded="${open}">
+              <span class="ls-state ${done ? 'done' : ''}">${done ? icon('check') : ''}</span>
+              <span class="ls-title">${esc(l.title)}</span>
+              <span class="ls-min">${l.mins} phút</span>${icon('chevron')}
+            </button>
+            ${open ? lessonHTML(l) : ''}
+          </li>`;
+        })
+        .join('');
+      return `<section class="level ${levelDone(lv.n) ? 'done' : ''}" id="level-${lv.n}">
+        <header class="level-head">
+          <span class="lv-num">${levelDone(lv.n) ? icon('check') : lv.n}</span>
+          <div><h2>Cấp ${lv.n}: ${esc(lv.title)}</h2><p>${esc(lv.goal)}</p></div>
+          <span class="level-count">${d}/${list.length}</span>
+        </header>
+        <ol class="lessons">${rows}</ol>
+      </section>`;
+    }).join(''),
+  );
+}
+
+function renderLearn() {
+  renderLevelBadge();
+  renderLearnBanner();
+  renderLearnHero();
+  renderLevels();
+}
+
+function openLesson(id, scroll = true) {
+  if (!lessonOf(id)) return;
+  if (location.hash.slice(1) !== 'hoc-ai') goTab('hoc-ai');
+  openLessonId = id;
+  renderLevels();
+  if (scroll) $(`#lesson-${id}`)?.scrollIntoView({ block: 'start' });
+}
+
+function answerQuiz(btn) {
+  const box = btn.closest('[data-quiz]');
+  const l = lessonOf(box.dataset.quiz);
+  const pick = Number(btn.dataset.pick);
+  const why = box.querySelector('.quiz-why');
+  if (pick !== l.quiz.answer) {
+    btn.dataset.state = 'wrong';
+    why.hidden = false;
+    why.className = 'quiz-why';
+    why.innerHTML = `${icon('x')}<span><b>Chưa đúng.</b> Đọc lại phần “Điều cần nhớ” rồi thử lại nhé.</span>`;
+    return;
+  }
+  const before = currentLevel().n;
+  const wasDone = levelDone(before);
+  learnDone.add(l.id);
+  remember('learnDone', JSON.stringify([...learnDone]));
+  for (const b of box.querySelectorAll('.quiz-opt')) b.disabled = true;
+  btn.dataset.state = 'right';
+  why.hidden = false;
+  why.className = 'quiz-why right';
+  why.innerHTML = `${icon('check')}<span><b>Đúng! +${XP_PER_LESSON} điểm.</b> ${esc(l.quiz.why)}</span>`;
+  box.parentElement.querySelector('.lesson-next')?.removeAttribute('hidden');
+  if (!wasDone && levelDone(before)) {
+    const now = currentLevel();
+    showToast(
+      learnDone.size === LESSONS.length
+        ? `${icon('grad')}<span><b>Hoàn thành lộ trình!</b> Bạn đã qua cả 5 cấp.</span>`
+        : `${icon('grad')}<span><b>Lên Cấp ${now.n}: ${esc(now.title)}!</b> ${esc(now.goal)}</span>`,
+    );
+  }
+  renderLevelBadge();
+  renderLearnBanner();
+  renderLearnHero();
+  // Tick the row without rebuilding the open lesson the reader is looking at.
+  const row = $(`#lesson-${l.id} .ls-state`);
+  if (row) { row.classList.add('done'); row.innerHTML = icon('check'); }
+  const lv = $(`#level-${l.level} .level-count`);
+  if (lv) lv.textContent = `${levelLessons(l.level).filter((x) => learnDone.has(x.id)).length}/${levelLessons(l.level).length}`;
+}
+
+// "Thử ngay": jump to the place on the site the lesson talks about.
+function tryLesson(go) {
+  if (go.palette) {
+    openPalette();
+    $('#palette-q').value = go.palette;
+    renderPalette();
+    return;
+  }
+  goTab(go.tab);
+  if (go.tab === 'tin-tuc' && go.q) {
+    state.q = go.q;
+    $('#q').value = go.q;
+    if (state.days < 30) { state.days = 30; $('#range').value = '30'; }
+    state.limit = 40;
+    if (data.news) renderRiver();
+    $('#river-block')?.scrollIntoView({ block: 'start' });
+  }
+  if (go.tab === 'ky-luc' && go.bench) {
+    race.bench = go.bench;
+    if (data.progress?.race) renderRace();
+  }
+  if (go.tab === 'y-tuong') {
+    if (go.problem && data.ideas) {
+      setIdeaView('compose');
+      chooseProblem(go.problem);
+    } else if (go.view) {
+      setIdeaView(go.view);
+    }
+  }
+}
+
+function initLearn() {
+  learnDone = new Set(stored('learnDone').filter((id) => lessonOf(id)));
+  renderLearn();
+  document.addEventListener('click', (e) => {
+    const open = e.target.closest('[data-open-lesson]');
+    if (open) {
+      $('#term-pop').hidden = true;
+      openLesson(open.dataset.openLesson);
+      return;
+    }
+    const toggle = e.target.closest('[data-toggle-lesson]');
+    if (toggle) {
+      const id = toggle.dataset.toggleLesson;
+      openLessonId = openLessonId === id ? null : id;
+      renderLevels();
+      if (openLessonId) $(`#lesson-${id}`)?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    const jump = e.target.closest('[data-level-jump]');
+    if (jump) { $(`#level-${jump.dataset.levelJump}`)?.scrollIntoView({ block: 'start' }); return; }
+    const pick = e.target.closest('.quiz-opt');
+    if (pick && !pick.disabled) { answerQuiz(pick); return; }
+    const t = e.target.closest('[data-try]');
+    if (t) tryLesson(lessonOf(t.dataset.try).try.go);
+  });
+}
+
+// ---------- jargon explained in place ----------
+
+// Underline the first mention of each known term (at most 3 per block) in text
+// that is already HTML-escaped.
+function gloss(html) {
+  if (!html) return html;
+  const hits = [];
+  for (const g of GLOSSARY) {
+    const m = g.re.exec(html);
+    if (m) hits.push({ g, at: m.index, len: m[0].length });
+  }
+  hits.sort((a, c) => a.at - c.at || c.len - a.len);
+  const keep = [];
+  for (const h of hits) {
+    if (keep.length >= 3) break;
+    if (keep.some((k) => h.at < k.at + k.len && k.at < h.at + h.len)) continue;
+    // Skip matches that fall inside an HTML entity such as &amp;.
+    if (/&[a-z#0-9]*$/i.test(html.slice(Math.max(0, h.at - 8), h.at))) continue;
+    keep.push(h);
+  }
+  keep.sort((a, c) => c.at - a.at);
+  let out = html;
+  for (const h of keep) {
+    out = `${out.slice(0, h.at)}<span class="term" data-term="${h.g.id}" tabindex="0">${out.slice(h.at, h.at + h.len)}</span>${out.slice(h.at + h.len)}`;
+  }
+  return out;
+}
+
+function initGlossary() {
+  const pop = $('#term-pop');
+  let timer = 0;
+  const show = (el) => {
+    const g = GLOSSARY.find((x) => x.id === el.dataset.term);
+    if (!g) return;
+    clearTimeout(timer);
+    const l = lessonOf(g.lesson);
+    pop.innerHTML = `<b>${esc(g.term)}</b><p>${esc(g.def)}</p>${l ? `<button type="button" class="linkbtn" data-open-lesson="${l.id}">${icon('grad')}Học bài: ${esc(l.title)} (${l.mins} phút)</button>` : ''}`;
+    pop.hidden = false;
+    const r = el.getBoundingClientRect();
+    const left = Math.min(window.innerWidth - pop.offsetWidth - 8, Math.max(8, r.left));
+    const below = r.bottom + 8 + pop.offsetHeight < window.innerHeight;
+    pop.style.left = `${left}px`;
+    pop.style.top = `${below ? r.bottom + 8 : r.top - pop.offsetHeight - 8}px`;
+  };
+  const hideSoon = () => { clearTimeout(timer); timer = setTimeout(() => { pop.hidden = true; }, 200); };
+  document.addEventListener('pointerover', (e) => {
+    const t = e.target.closest('.term');
+    if (t && e.pointerType === 'mouse') show(t);
+  });
+  document.addEventListener('pointerout', (e) => {
+    if (e.target.closest('.term') && e.pointerType === 'mouse') hideSoon();
+  });
+  document.addEventListener('focusin', (e) => { if (e.target.classList?.contains('term')) show(e.target); });
+  pop.addEventListener('pointerenter', () => clearTimeout(timer));
+  pop.addEventListener('pointerleave', hideSoon);
+  // Touch: tap a term to open, tap anywhere else to close.
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('.term');
+    if (t) { e.preventDefault(); show(t); return; }
+    if (!e.target.closest('#term-pop')) pop.hidden = true;
+  }, true);
+  addEventListener('scroll', () => { pop.hidden = true; }, { passive: true });
+}
+
 // ---------- quick search (Ctrl/⌘ K) ----------
 
-const PAGE_ICONS = { 'tong-quan': 'home', 'tin-tuc': 'news', repo: 'repo', 'cong-nghe': 'layers', 'y-tuong': 'bulb', 'nghien-cuu': 'book', 'ky-luc': 'trophy' };
+const PAGE_ICONS = { 'tong-quan': 'home', 'hoc-ai': 'grad', 'tin-tuc': 'news', repo: 'repo', 'cong-nghe': 'layers', 'y-tuong': 'bulb', 'nghien-cuu': 'book', 'ky-luc': 'trophy' };
 // With an empty query, show only a few starting points.
-const PAL_START = { 'Trang': 7, 'Tin tức': 4, 'Repo': 4 };
+const PAL_START = { 'Trang': 8, 'Bài học': 3, 'Tin tức': 4, 'Repo': 4 };
 let palIndex = [];
 let palItems = [];
 let palSel = 0;
@@ -1890,6 +2196,8 @@ let palSel = 0;
 function searchIndex() {
   const out = [];
   for (const a of $$('.nav a[data-tab]')) out.push({ group: 'Trang', icon: PAGE_ICONS[a.dataset.tab], title: a.querySelector('span').textContent, tab: a.dataset.tab });
+  for (const l of LESSONS) out.push({ group: 'Bài học', icon: 'grad', title: l.title, sub: `Cấp ${l.level} · ${l.mins} phút`, lesson: l.id, extra: l.key });
+  for (const g of GLOSSARY) out.push({ group: 'Giải thích từ', icon: 'book', title: g.term, sub: g.def, lesson: g.lesson });
   for (const p of data.ideas ? allProblems() : []) out.push({ group: 'Bài toán', icon: 'bulb', title: p.title, sub: p.area, problem: p.id });
   for (const t of data.tech?.techs ?? []) out.push({ group: 'Công nghệ', icon: 'layers', title: t.name, sub: `${t.total} lượt nhắc`, tab: 'cong-nghe', extra: t.what });
   for (const r of [...(data.repos?.trending ?? []), ...(data.repos?.rising ?? [])]) out.push({ group: 'Repo', icon: 'repo', title: r.name, sub: tx(r, 'description'), url: r.url, extra: r.description });
@@ -1954,6 +2262,8 @@ function openPal(it) {
   closePalette();
   if (it.url) {
     window.open(it.url, '_blank', 'noopener');
+  } else if (it.lesson) {
+    openLesson(it.lesson);
   } else if (it.problem) {
     goTab('y-tuong');
     setIdeaView('compose');
@@ -2162,6 +2472,8 @@ try {
   renderLanguage();
   initSparkHover();
   initRace();
+  initLearn();
+  initGlossary();
   initIdeas();
   initPalette();
   syncThemeIcon();
