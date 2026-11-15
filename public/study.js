@@ -465,4 +465,21 @@ function initStudy() {
       rateCard(Number(e.key) - 1);
     }
   });
+  openLinkedCards();
+}
+
+// Links from the Telegram reminder: ?the=<card id> opens that card,
+// ?the=all opens the decks (or the cards due today, if any).
+function openLinkedCards() {
+  const params = new URLSearchParams(location.search);
+  const id = params.get('the');
+  if (!id) return;
+  params.delete('the');
+  history.replaceState(null, '', `${location.pathname}${params.size ? `?${params}` : ''}${location.hash}`);
+  if (cardOf(id)) startReview({ card: id });
+  else if (dueCount()) startReview({ due: true });
+  else {
+    if (location.hash.slice(1) !== 'hoc-ai') goTab('hoc-ai');
+    setLearnView('cards');
+  }
 }

@@ -43,6 +43,7 @@ Repo, paper và mô hình/ứng dụng Hugging Face cũng được lọc cho dev
 ```
 server.js        máy chủ chạy trên máy: tính /data/<tên>.json trực tiếp
 scripts/build.js ghi public/data/*.json để đăng lên host tĩnh
+scripts/telegram.js gửi 3 thẻ ôn mỗi tối qua Telegram
 lib/data.js      danh sách các bộ dữ liệu (news, repos, tech, ideas, models, tools, papers, progress)
 lib/news.js      danh sách nguồn, gom cụm tin, đếm xu hướng
 lib/feed.js      đọc RSS/Atom
@@ -72,3 +73,15 @@ Không cần máy chủ: GitHub Actions chạy `scripts/build.js` mỗi 30 phút
 5. (Nên làm) Tạo khóa miễn phí ở [Google AI Studio](https://aistudio.google.com/apikey), rồi vào **Settings → Secrets and variables → Actions → New repository secret**, đặt tên `GEMINI_API_KEY`. Lần build sau tin và repo sẽ có ba dòng giải thích. Muốn đổi model thì thêm biến (Variables) `AI_MODEL` (mặc định thử lần lượt `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`).
 
 Lịch 30 phút của GitHub có thể trễ vài phút. Nếu một nguồn dữ liệu lỗi, bản build giữ lại dữ liệu cũ của phần đó; nếu tất cả đều lỗi thì trang đang chạy được giữ nguyên.
+
+## Nhắc ôn qua Telegram
+
+Mỗi tối 20:00 (giờ Việt Nam) workflow "Nhắc ôn qua Telegram" (`.github/workflows/telegram.yml`) gửi 3 thẻ, mỗi cấp một thẻ, đáp án bị che (chạm để xem), kèm link mở đúng thẻ đó trên trang. Mỗi bộ đi hết 30 thẻ rồi mới lặp lại. Tiến độ ôn nằm trong trình duyệt nên tin nhắn không biết thẻ nào bạn đã thuộc.
+
+1. Trên Telegram, nhắn [@BotFather](https://t.me/BotFather) lệnh `/newbot`, đặt tên, nhận **token** (dạng `123456:ABC…`). Giữ kín token này.
+2. Mở bot vừa tạo, bấm **Start**.
+3. Lấy **chat id**: trên máy, chạy `TELEGRAM_BOT_TOKEN=<token> node scripts/telegram.js --chats` (dòng in ra có dạng `123456789  Tên bạn`).
+4. Vào **Settings → Secrets and variables → Actions → New repository secret**, thêm `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID`.
+5. Thử ngay: tab **Actions** → "Nhắc ôn qua Telegram" → **Run workflow**.
+
+Xem trước nội dung mà không gửi: `node scripts/telegram.js --dry`. Muốn đổi giờ gửi thì sửa dòng `cron` (giờ UTC, tức giờ Việt Nam trừ 7).

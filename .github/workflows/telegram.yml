@@ -1,0 +1,29 @@
+name: Nhắc ôn qua Telegram
+
+on:
+  schedule:
+    # 13:00 UTC = 20:00 giờ Việt Nam. GitHub may start scheduled runs a few minutes late.
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # Bot token from @BotFather and your chat id (see README). Without them the
+      # run only logs a warning.
+      - name: Gửi 3 thẻ ôn
+        run: node scripts/telegram.js
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
