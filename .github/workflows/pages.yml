@@ -46,7 +46,7 @@ jobs:
       # Pages lets browsers cache files for 10 minutes; versioned URLs make a new
       # page load its matching script and styles instead of stale copies.
       - name: Gắn phiên bản cho JS/CSS
-        run: sed -i -E "s/(app\.js|learn\.js|style\.css)\"/\1?v=${GITHUB_SHA::8}\"/g" public/index.html
+        run: sed -i -E "s/(app\.js|learn\.js|cards\.js|study\.js|style\.css)\"/\1?v=${GITHUB_SHA::8}\"/g" public/index.html
 
       - uses: actions/upload-pages-artifact@v4
         with:

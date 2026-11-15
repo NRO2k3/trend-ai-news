@@ -14,7 +14,7 @@ Thanh bên trái (trên điện thoại là thanh dưới cùng) chuyển giữa
 
 | Tab | Nội dung | Nguồn dữ liệu |
 |---|---|---|
-| Học AI | Lộ trình 5 cấp cho dev web (20 bài, mỗi bài 2–3 phút): đọc, “Thử ngay” trên trang, trả lời câu hỏi để qua bài, lên cấp; huy hiệu cấp ở thanh bên. Từ khó (agent, MCP, RAG, token…) trong tin, repo, mô hình được gạch chân, rê hoặc chạm để xem giải thích | nội dung trong `public/learn.js`, tiến độ lưu trong trình duyệt |
+| Học AI | Lộ trình 5 cấp cho dev web (20 bài, mỗi bài 2–3 phút): đọc, “Thử ngay” trên trang, trả lời câu hỏi để qua bài, lên cấp; huy hiệu cấp ở thanh bên. Từ khó (agent, MCP, RAG, token…) trong tin, repo, mô hình được gạch chân, rê hoặc chạm để xem giải thích. **Thẻ ôn tập**: 90 thẻ 3 cấp Cơ bản / Trung bình / Nâng cao, lật thẻ rồi tự chấm, thẻ quay lại sau 1, 3, 7, 16, 35 ngày (phím Space, 1, 2, 3). **Thói quen**: bản đồ nhiệt 12 tuần, chuỗi ngày học, mục tiêu tuần và nhận xét thẳng “chăm chỉ” hay “đang lười” | bài trong `public/learn.js`, thẻ trong `public/cards.js`, ôn thẻ và thói quen trong `public/study.js`; tiến độ lưu trong trình duyệt |
 | Tin tức | Tin nóng (một sự kiện nhiều báo đưa thì gom thành một cụm), tất cả tin có bộ lọc, công ty/chủ đề được nói tới nhiều; mỗi tin ghi sẵn Là gì · Giải bài toán gì · Dùng khi | RSS của 14 nguồn bên dưới, bỏ tin rác theo tiêu đề (`JUNK` trong `lib/news.js`) và theo đánh giá của Gemini |
 | Repo hot | Repo AI hot tuần này; repo AI mới tạo tăng sao nhanh trong 30 ngày; mỗi repo ghi Là gì · Giải bài toán gì · Dùng khi | [GitHub Trending](https://github.com/trending), GitHub Search API |
 | Công nghệ & công cụ | 19 công nghệ (AI Agent, MCP, RAG…) kèm giải thích và số lần được nhắc; mô hình mới; mô hình mở và ứng dụng đang hot | tính từ các nguồn khác, [OpenRouter](https://openrouter.ai/models), [Hugging Face](https://huggingface.co) |
@@ -56,7 +56,7 @@ lib/problems.js  bài toán thật và nút thắt chung nối chúng với nhau
 lib/ideas.js     gắn repo/paper/tin vào bài toán và công nghệ, ghép tia lửa hôm nay
 lib/translate.js dịch sang tiếng Việt (Google Dịch, có bộ nhớ đệm)
 lib/explain.js   Gemini ghi "là gì, giải bài toán gì, dùng khi" cho tin và repo, lọc tin rác
-public/          giao diện
+public/          giao diện (learn.js bài học, cards.js thẻ ôn, study.js ôn thẻ và thói quen)
 ```
 
 Khi chạy trên máy, bấm "Làm mới" sẽ lấy lại dữ liệu ngay, bỏ qua bộ nhớ đệm.

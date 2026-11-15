@@ -79,6 +79,7 @@
         <span class="lv-text"><small>Cấp của bạn</small><b id="lv-title">Người mới</b></span>
         <span class="lv-bar"><i id="lv-fill"></i></span>
         <small class="lv-sub" id="lv-sub">0/20 bài</small>
+        <small class="lv-habit" id="lv-habit"></small>
       </a>
       <div class="sidebar-foot">
         <div class="status"><span class="live"></span><span id="updated">Đang tải…</span></div>
@@ -149,11 +150,20 @@
         <header class="page-head">
           <div>
             <h1>Học AI cho dev web</h1>
-            <p class="lede">5 cấp, từ người mới tới người tạo ra sản phẩm AI. Mỗi bài 2–3 phút: đọc, bấm <b>Thử ngay</b> để thấy điều đó ngay trên trang, rồi trả lời một câu hỏi là qua bài. Tiến độ lưu trong trình duyệt này.</p>
+            <p class="lede">5 cấp, từ người mới tới người tạo ra sản phẩm AI. Mỗi bài 2–3 phút: đọc, bấm <b>Thử ngay</b> để thấy điều đó ngay trên trang, rồi trả lời một câu hỏi là qua bài. Sau đó ôn bằng thẻ để nhớ lâu, và xem mình học có đều không. Tiến độ lưu trong trình duyệt này.</p>
           </div>
         </header>
-        <section class="learn-hero" id="learn-hero"></section>
-        <div class="levels" id="levels"></div>
+        <div class="seg learn-views" id="learn-views" role="group" aria-label="Phần của trang Học AI">
+          <button type="button" data-learn-view="lessons" aria-pressed="true"><svg class="i"><use href="#i-grad"/></svg>Bài học<em class="count" data-count="learn-lessons"></em></button>
+          <button type="button" data-learn-view="cards" aria-pressed="false"><svg class="i"><use href="#i-copy"/></svg>Thẻ ôn tập<em class="count" data-count="learn-cards"></em></button>
+          <button type="button" data-learn-view="habit" aria-pressed="false"><svg class="i"><use href="#i-flame"/></svg>Thói quen<em class="count" data-count="learn-habit"></em></button>
+        </div>
+        <div data-learn-pane="lessons">
+          <section class="learn-hero" id="learn-hero"></section>
+          <div class="levels" id="levels"></div>
+        </div>
+        <section class="cards-pane" id="cards-pane" data-learn-pane="cards" hidden></section>
+        <section class="habit-pane" id="habit-pane" data-learn-pane="habit" hidden></section>
       </section>
 
       <!-- Tin tức -->
@@ -433,6 +443,8 @@
   <div id="term-pop" class="term-pop" role="tooltip" hidden></div>
   <div id="toast" class="toast" role="status" hidden></div>
   <script src="learn.js"></script>
+  <script src="cards.js"></script>
+  <script src="study.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

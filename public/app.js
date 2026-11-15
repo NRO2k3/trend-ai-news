@@ -1933,11 +1933,15 @@ function renderLevelBadge() {
   $('#lv-title').textContent = lv.title;
   $('#lv-sub').textContent = finished ? 'Đã hoàn thành lộ trình' : `${done}/${all} bài · ${done * XP_PER_LESSON} điểm`;
   $('#lv-fill').style.width = `${Math.round((done / all) * 100)}%`;
-  setCount('learn', finished ? '' : `Cấp ${lv.n}`);
+  const due = dueCount();
+  setCount('learn', due ? `${due} thẻ` : finished ? '' : `Cấp ${lv.n}`);
+  renderHabitBadge();
 }
 
 function renderLearnBanner() {
   const next = nextLesson();
+  const study = studyBanner(next);
+  if (study) return setHTML('#learn-banner', study);
   if (!next) return setHTML('#learn-banner', '');
   const fresh = !learnDone.size;
   const lv = LEVELS[next.level - 1];
@@ -1992,6 +1996,7 @@ function lessonHTML(l) {
       <p class="quiz-why${done ? ' right' : ''}"${done ? '' : ' hidden'}>${done ? `${icon('check')}<span><b>Đúng.</b> ${esc(l.quiz.why)}</span>` : ''}</p>
     </div>
     ${after ? `<button type="button" class="linkbtn lesson-next" data-open-lesson="${after.id}"${done ? '' : ' hidden'}>Bài tiếp: ${esc(after.title)} ${icon('arrow')}</button>` : ''}
+    ${lessonCardsButton(l, done)}
   </div>`;
 }
 
@@ -2037,6 +2042,7 @@ function renderLearn() {
 function openLesson(id, scroll = true) {
   if (!lessonOf(id)) return;
   if (location.hash.slice(1) !== 'hoc-ai') goTab('hoc-ai');
+  setLearnView('lessons');
   openLessonId = id;
   renderLevels();
   if (scroll) $(`#lesson-${id}`)?.scrollIntoView({ block: 'start' });
@@ -2056,6 +2062,7 @@ function answerQuiz(btn) {
   }
   const before = currentLevel().n;
   const wasDone = levelDone(before);
+  if (!learnDone.has(l.id)) logStudy(1, 0, l.mins);
   learnDone.add(l.id);
   remember('learnDone', JSON.stringify([...learnDone]));
   for (const b of box.querySelectorAll('.quiz-opt')) b.disabled = true;
@@ -2064,6 +2071,7 @@ function answerQuiz(btn) {
   why.className = 'quiz-why right';
   why.innerHTML = `${icon('check')}<span><b>Đúng! +${XP_PER_LESSON} điểm.</b> ${esc(l.quiz.why)}</span>`;
   box.parentElement.querySelector('.lesson-next')?.removeAttribute('hidden');
+  box.parentElement.querySelector('.lesson-cards')?.removeAttribute('hidden');
   if (!wasDone && levelDone(before)) {
     const now = currentLevel();
     showToast(
@@ -2075,6 +2083,7 @@ function answerQuiz(btn) {
   renderLevelBadge();
   renderLearnBanner();
   renderLearnHero();
+  renderLearnTabs();
   // Tick the row without rebuilding the open lesson the reader is looking at.
   const row = $(`#lesson-${l.id} .ls-state`);
   if (row) { row.classList.add('done'); row.innerHTML = icon('check'); }
@@ -2218,6 +2227,7 @@ function searchIndex() {
   for (const a of $$('.nav a[data-tab]')) out.push({ group: 'Trang', icon: PAGE_ICONS[a.dataset.tab], title: a.querySelector('span').textContent, tab: a.dataset.tab });
   for (const l of LESSONS) out.push({ group: 'Bài học', icon: 'grad', title: l.title, sub: `Cấp ${l.level} · ${l.mins} phút`, lesson: l.id, extra: l.key });
   for (const g of GLOSSARY) out.push({ group: 'Giải thích từ', icon: 'book', title: g.term, sub: g.def, lesson: g.lesson });
+  for (const c of CARDS) out.push({ group: 'Thẻ ôn', icon: 'copy', title: c.q, sub: `${DECKS[c.tier - 1].title} · ${c.topic}`, card: c.id, extra: c.a.replace(/<[^>]+>/g, '') });
   for (const p of data.ideas ? allProblems() : []) out.push({ group: 'Bài toán', icon: 'bulb', title: p.title, sub: p.area, problem: p.id });
   for (const t of data.tech?.techs ?? []) out.push({ group: 'Công nghệ', icon: 'layers', title: t.name, sub: `${t.total} lượt nhắc`, tab: 'cong-nghe', extra: t.what });
   for (const r of [...(data.repos?.trending ?? []), ...(data.repos?.rising ?? [])]) out.push({ group: 'Repo', icon: 'repo', title: r.name, sub: tx(r, 'description'), url: r.url, extra: r.description });
@@ -2282,6 +2292,8 @@ function openPal(it) {
   closePalette();
   if (it.url) {
     window.open(it.url, '_blank', 'noopener');
+  } else if (it.card) {
+    startReview({ card: it.card });
   } else if (it.lesson) {
     openLesson(it.lesson);
   } else if (it.problem) {
@@ -2493,6 +2505,7 @@ try {
   initSparkHover();
   initRace();
   initLearn();
+  initStudy();
   initGlossary();
   initIdeas();
   initPalette();
