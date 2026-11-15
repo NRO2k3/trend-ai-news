@@ -19,7 +19,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -38,6 +38,10 @@ jobs:
         env:
           PREVIOUS_URL: ${{ steps.pages.outputs.base_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Free key from aistudio.google.com: plain-Vietnamese notes for news and repos.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Optional repository variable to pick other models, comma separated.
+          AI_MODEL: ${{ vars.AI_MODEL }}
 
       # Pages lets browsers cache files for 10 minutes; versioned URLs make a new
       # page load its matching script and styles instead of stale copies.

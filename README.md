@@ -15,14 +15,16 @@ Thanh bên trái (trên điện thoại là thanh dưới cùng) chuyển giữa
 | Tab | Nội dung | Nguồn dữ liệu |
 |---|---|---|
 | Học AI | Lộ trình 5 cấp cho dev web (20 bài, mỗi bài 2–3 phút): đọc, “Thử ngay” trên trang, trả lời câu hỏi để qua bài, lên cấp; huy hiệu cấp ở thanh bên. Từ khó (agent, MCP, RAG, token…) trong tin, repo, mô hình được gạch chân, rê hoặc chạm để xem giải thích | nội dung trong `public/learn.js`, tiến độ lưu trong trình duyệt |
-| Tin tức | Tin nóng (một sự kiện nhiều báo đưa thì gom thành một cụm), tất cả tin có bộ lọc, công ty/chủ đề được nói tới nhiều | RSS của 14 nguồn bên dưới, bỏ tin rác theo tiêu đề (`JUNK` trong `lib/news.js`) |
-| Repo hot | Repo AI hot tuần này; repo AI mới tạo tăng sao nhanh trong 30 ngày | [GitHub Trending](https://github.com/trending), GitHub Search API |
+| Tin tức | Tin nóng (một sự kiện nhiều báo đưa thì gom thành một cụm), tất cả tin có bộ lọc, công ty/chủ đề được nói tới nhiều; mỗi tin ghi sẵn Là gì · Giải bài toán gì · Dùng khi | RSS của 14 nguồn bên dưới, bỏ tin rác theo tiêu đề (`JUNK` trong `lib/news.js`) và theo đánh giá của Gemini |
+| Repo hot | Repo AI hot tuần này; repo AI mới tạo tăng sao nhanh trong 30 ngày; mỗi repo ghi Là gì · Giải bài toán gì · Dùng khi | [GitHub Trending](https://github.com/trending), GitHub Search API |
 | Công nghệ & công cụ | 19 công nghệ (AI Agent, MCP, RAG…) kèm giải thích và số lần được nhắc; mô hình mới; mô hình mở và ứng dụng đang hot | tính từ các nguồn khác, [OpenRouter](https://openrouter.ai/models), [Hugging Face](https://huggingface.co) |
 | Ý tưởng | Dành cho dev web: 19 bài toán thật của nghề web. Tia lửa hôm nay (thứ đang hot ghép với một bài toán thật); bàn ghép bài toán × công nghệ; bản đồ nút thắt chung nối các bài toán; tự chấm điểm và sổ ý tưởng (lưu trong trình duyệt) | Bài toán và nút thắt trong `lib/problems.js`, ghép với dữ liệu các tab khác |
 | Nghiên cứu | Paper được thích nhiều nhất | [Hugging Face Papers](https://huggingface.co/papers) |
 | Chọn model AI | Chọn việc cần làm (dựng giao diện web, sửa code trong dự án, chạy lệnh/DevOps, chatbot trả lời khách) → 3 gợi ý: giỏi nhất, đáng tiền nhất, tự cài được, kèm chi phí ước tính; tra một model xem mạnh/yếu từng việc, nên và không nên dùng cho gì; xem sâu: giá so với điểm, cuộc đua theo hãng, mã nguồn mở đi sau bao xa, bảng xếp hạng; kỷ lục WebDev Arena, CursorBench, SWE-bench Verified, Terminal-Bench, SimpleQA Verified, METR | [Epoch AI](https://epoch.ai/benchmarks), giá từ [OpenRouter](https://openrouter.ai/models) |
 
 Tiêu đề, tóm tắt và mô tả tiếng Anh được dịch sang tiếng Việt bằng Google Dịch lúc lấy dữ liệu (`lib/translate.js`); nút "Bản gốc" chuyển về tiếng Anh. Danh sách công nghệ và lời giải thích nằm trong `lib/tech.js`.
+
+Ba dòng "Là gì · Giải bài toán gì · Dùng khi" của tin và repo do Gemini viết lúc lấy dữ liệu (`lib/explain.js`, cần `GEMINI_API_KEY`, xem mục đăng lên GitHub Pages). Gemini cũng đánh dấu tin dev web không làm gì được để bỏ đi. Mỗi lần chỉ hỏi tin, repo mới; thiếu khóa hoặc hết lượt thì trang hiện tóm tắt thường.
 
 Tab **Ý tưởng** nối các bài toán của nghề web với nhau qua *nút thắt chung*, ví dụ "Kiểm thử, xác minh tốn công" gặp ở cả test E2E, review PR, nâng cấp thư viện, kiểm tra a11y và hiệu năng: chọn một bài toán và 1–2 công nghệ sẽ thấy nút thắt nào được gỡ, bài toán nào khác dùng chung được lời giải, công nghệ đó đang được nhắc nhiều cỡ nào, và repo/mô hình có sẵn để làm thử. Thêm bài toán hoặc nút thắt mới trong `lib/problems.js`; người dùng cũng tự thêm bài toán của mình ngay trên trang.
 
@@ -53,6 +55,7 @@ lib/tech.js      công nghệ đang hot, đếm từ repo, tin tức và Hugging
 lib/problems.js  bài toán thật và nút thắt chung nối chúng với nhau
 lib/ideas.js     gắn repo/paper/tin vào bài toán và công nghệ, ghép tia lửa hôm nay
 lib/translate.js dịch sang tiếng Việt (Google Dịch, có bộ nhớ đệm)
+lib/explain.js   Gemini ghi "là gì, giải bài toán gì, dùng khi" cho tin và repo, lọc tin rác
 public/          giao diện
 ```
 
@@ -66,5 +69,6 @@ Không cần máy chủ: GitHub Actions chạy `scripts/build.js` mỗi 30 phút
 2. Vào **Settings → Pages**, mục **Source** chọn **GitHub Actions**.
 3. Vào tab **Actions**, chọn workflow "Cập nhật và đăng trang", bấm **Run workflow**.
 4. Trang sẽ có ở `https://<tên-tài-khoản>.github.io/trend-ai-news/`.
+5. (Nên làm) Tạo khóa miễn phí ở [Google AI Studio](https://aistudio.google.com/apikey), rồi vào **Settings → Secrets and variables → Actions → New repository secret**, đặt tên `GEMINI_API_KEY`. Lần build sau tin và repo sẽ có ba dòng giải thích. Muốn đổi model thì thêm biến (Variables) `AI_MODEL` (mặc định thử lần lượt `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`).
 
 Lịch 30 phút của GitHub có thể trễ vài phút. Nếu một nguồn dữ liệu lỗi, bản build giữ lại dữ liệu cũ của phần đó; nếu tất cả đều lỗi thì trang đang chạy được giữ nguyên.

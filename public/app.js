@@ -197,7 +197,8 @@ function renderOverviewHot() {
       ? hot
           .map((c, i) => {
             const it = c.lead;
-            const sum = i === 0 ? tx(it, 'summary') : '';
+            const note = noteOf(it);
+            const sum = note ? note.what : i === 0 ? tx(it, 'summary') : '';
             return `<a class="feature" href="${esc(safeUrl(it.url))}" target="_blank" rel="noopener noreferrer">
               <div>
                 <div class="feature-title">${esc(tx(it, 'title'))}</div>
@@ -221,7 +222,7 @@ function renderOverviewRepos() {
         const [owner, name] = r.name.split('/');
         return `<a class="row" href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">
           ${avatar(owner)}
-          <div class="min0"><div class="row-title mono">${esc(owner)}/<b>${esc(name)}</b></div><div class="row-sub">${esc(tx(r, 'description'))}</div></div>
+          <div class="min0"><div class="row-title mono">${esc(owner)}/<b>${esc(name)}</b></div><div class="row-sub">${esc(noteOf(r)?.what || tx(r, 'description'))}</div></div>
           <span class="pill-up">${icon('star')}+${nf0.format(r.week || r.today)}</span>
         </a>`;
       })
@@ -1017,6 +1018,23 @@ function metaRow(it, extra = '') {
   return `<div class="meta"><span class="src">${esc(it.sourceName)}</span><span class="sep"></span><time datetime="${it.date}" title="${new Date(it.date).toLocaleString('vi-VN')}">${ago(it.date)}</time>${extra}</div>`;
 }
 
+// Plain-Vietnamese note written at build time: what the thing is, which problem it
+// solves and when to use it. English mode keeps the source's own summary.
+const ACTS = { try: 'Thử được ngay', read: 'Nên đọc', know: 'Để biết' };
+const noteOf = (it) => (state.lang === 'vi' ? it.note : null);
+const actTag = (n) => (n?.act ? `<span class="tag act-${n.act}">${ACTS[n.act]}</span>` : '');
+
+function noteHTML(n) {
+  const rows = [
+    ['Là gì', n.what],
+    ['Giải bài toán', n.problem],
+    ['Dùng khi', n.use?.replace(/^khi\s+/i, '')],
+  ].filter(([, v]) => v);
+  return `<dl class="note" title="AI tóm tắt từ bài gốc, có thể sai. Bấm tiêu đề để đọc bản gốc.">${rows
+    .map(([k, v]) => `<div><dt>${k}</dt><dd>${gloss(esc(v))}</dd></div>`)
+    .join('')}</dl>`;
+}
+
 // The busiest stories first; the rest wait behind a button so the latest news stays close.
 const HOT_FIRST = 3;
 let showAllHot = false;
@@ -1039,11 +1057,12 @@ function renderHot() {
           .map((r) => `<li><b>${esc(r.sourceName)}:</b> ${link(r.url, esc(tx(r, 'title')))}</li>`)
           .join('');
         const summary = tx(it, 'summary');
+        const note = noteOf(it);
         return `<article class="hot">
           <div class="min0">
-            <div class="meta"><span class="dot cat-${it.cat}"></span><span class="src">${esc(it.sourceName)}</span><span class="sep"></span><span>${ago(it.date)}</span><span class="badge">${c.sourceCount} nguồn cùng đưa</span></div>
+            <div class="meta"><span class="dot cat-${it.cat}"></span><span class="src">${esc(it.sourceName)}</span><span class="sep"></span><span>${ago(it.date)}</span><span class="badge">${c.sourceCount} nguồn cùng đưa</span>${actTag(note)}</div>
             ${link(it.url, esc(tx(it, 'title')), 'title')}
-            ${summary ? `<p class="sum">${gloss(esc(summary))}</p>` : ''}
+            ${note ? noteHTML(note) : summary ? `<p class="sum">${gloss(esc(summary))}</p>` : ''}
             ${related ? `<details class="related"><summary>Các nguồn khác viết gì ${icon('chevron')}</summary><ul>${related}</ul></details>` : ''}
           </div>
           ${thumb(it.image)}
@@ -1065,7 +1084,7 @@ function filteredItems() {
       (!state.source || it.source === state.source) &&
       Date.parse(it.date) >= cutoff &&
       (!re || re.test(`${it.title} ${it.summary}`)) &&
-      (!q || `${it.title} ${it.summary} ${it.titleVi ?? ''} ${it.summaryVi ?? ''} ${it.sourceName}`.toLowerCase().includes(q)),
+      (!q || `${it.title} ${it.summary} ${it.titleVi ?? ''} ${it.summaryVi ?? ''} ${it.note ? Object.values(it.note).join(' ') : ''} ${it.sourceName}`.toLowerCase().includes(q)),
   );
 }
 
@@ -1112,12 +1131,13 @@ function renderRiver() {
         const head = day !== lastDay ? `<h3 class="day">${day}</h3>` : '';
         lastDay = day;
         const summary = tx(it, 'summary');
+        const note = noteOf(it);
         return `${head}<article class="item">
           <span class="src-badge" style="background:var(--cat-${it.cat})" title="${esc(it.sourceName)}">${esc(initials(it.sourceName))}</span>
           <div class="min0">
             ${link(it.url, esc(tx(it, 'title')), 'title')}
-            ${summary ? `<p class="sum">${gloss(esc(summary))}</p>` : ''}
-            ${metaRow(it)}
+            ${note ? noteHTML(note) : summary ? `<p class="sum">${gloss(esc(summary))}</p>` : ''}
+            ${metaRow(it, actTag(note))}
           </div>
           ${thumb(it.image)}
         </article>`;
@@ -1229,7 +1249,7 @@ function renderRepos(repos) {
             ${avatar(owner)}
             <div class="min0">
               ${link(r.url, `${esc(owner)}/<b>${esc(name)}</b>`, 'repo-name')}
-              ${r.description ? `<p>${gloss(esc(tx(r, 'description')))}</p>` : ''}
+              ${noteOf(r) ? noteHTML(noteOf(r)) : r.description ? `<p>${gloss(esc(tx(r, 'description')))}</p>` : ''}
               <div class="meta">${lang}${rising ? `<span>tạo ${ago(r.created)}</span>` : ''}${topics}</div>
             </div>
             <div class="repo-side">

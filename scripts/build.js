@@ -2,6 +2,7 @@
 // (GitHub Pages). Run on a schedule to keep the data fresh.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { DATA } from '../lib/data.js';
+import { learnNotes } from '../lib/explain.js';
 import { learnFrom } from '../lib/translate.js';
 import { fetchText } from '../lib/util.js';
 
@@ -16,7 +17,9 @@ if (PREVIOUS) {
     Object.keys(DATA).map(async (name) => {
       try {
         previous[name] = await fetchText(`${PREVIOUS}data/${name}.json`);
-        learnFrom(JSON.parse(previous[name]));
+        const old = JSON.parse(previous[name]);
+        learnFrom(old);
+        if (name === 'news' || name === 'repos') learnNotes(old);
       } catch {
         // first deploy, or the live site is down: start from scratch
       }
