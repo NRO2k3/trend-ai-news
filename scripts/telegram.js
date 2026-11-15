@@ -15,6 +15,7 @@ const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? 'NRO2k3/trend-ai-news').
 const SITE = process.env.SITE_URL ?? `https://${owner.toLowerCase()}.github.io/${repo}/`;
 const VN_OFFSET = 7 * 3600e3;
 const WEEKDAYS = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+const DOTS = ['🟢', '🔵', '🟣']; // Cơ bản, Trung bình, Nâng cao
 
 // cards.js is a plain browser script that declares DECKS and CARDS.
 async function loadCards() {
@@ -36,21 +37,23 @@ function buildMessage({ DECKS, CARDS }, now = new Date()) {
   const vn = new Date(now.getTime() + VN_OFFSET);
   const day = Math.floor(vn.getTime() / 864e5);
   const date = `${WEEKDAYS[vn.getUTCDay()]} ${vn.getUTCDate()}/${vn.getUTCMonth() + 1}`;
-  const blocks = pickCards(CARDS, day).map((c, i) => {
-    const answer = c.ex ? `${c.a}\n💡 ${c.ex}` : c.a;
-    return [
-      `<b>${i + 1}. ${DECKS[c.tier - 1].title} · ${esc(c.topic)}</b>`,
-      esc(c.q),
-      `<tg-spoiler>${answer}</tg-spoiler>`,
-      `<a href="${SITE}?the=${c.id}#hoc-ai">Ôn thẻ này trên trang</a>`,
-    ].join('\n');
+  const cards = pickCards(CARDS, day);
+  const deck = (c) => `${DOTS[c.tier - 1]} ${DECKS[c.tier - 1].title}`;
+  // Question in bold, answer (and tip) blurred inside a quote block.
+  const blocks = cards.map((c) => {
+    const answer = c.ex ? `${c.a}\n\n💡 ${c.ex}` : c.a;
+    return `${deck(c)} · <i>${esc(c.topic)}</i>\n<b>${esc(c.q)}</b>\n<blockquote><tg-spoiler>${answer}</tg-spoiler></blockquote>`;
   });
-  return [
-    `<b>🧠 Ôn AI 2 phút · ${date}</b>`,
-    'Tự trả lời trong đầu, rồi chạm vào phần bị che để xem đáp án.',
+  const text = [
+    `🧠 <b>Ôn AI · ${date}</b>\n<i>3 câu, khoảng 2 phút. Tự trả lời trước, rồi chạm vào ô mờ để xem đáp án.</i>`,
     ...blocks,
-    'Ôn thêm trên trang để giữ chuỗi ngày học của bạn.',
+    '<i>Chấm điểm trên trang để giữ chuỗi ngày học 👇</i>',
   ].join('\n\n');
+  const keyboard = [
+    cards.map((c) => ({ text: deck(c), url: `${SITE}?the=${c.id}#hoc-ai` })),
+    [{ text: '📚 Mở bộ thẻ ôn tập', url: `${SITE}?the=all#hoc-ai` }],
+  ];
+  return { text, keyboard };
 }
 
 async function api(method, body) {
@@ -67,9 +70,10 @@ async function api(method, body) {
 async function main() {
   const args = process.argv.slice(2);
   const deck = await loadCards();
-  const text = buildMessage(deck);
+  const { text, keyboard } = buildMessage(deck);
   if (args.includes('--dry')) {
     console.log(text);
+    console.log(keyboard.map((row) => row.map((b) => `[${b.text}]`).join(' ')).join('\n'));
     return;
   }
   if (!TOKEN) {
@@ -96,7 +100,7 @@ async function main() {
     text,
     parse_mode: 'HTML',
     link_preview_options: { is_disabled: true },
-    reply_markup: { inline_keyboard: [[{ text: 'Mở thẻ ôn tập', url: `${SITE}?the=all#hoc-ai` }]] },
+    reply_markup: { inline_keyboard: keyboard },
   });
   console.log('Đã gửi 3 thẻ ôn.');
 }
