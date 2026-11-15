@@ -1,9 +1,8 @@
-// Evening review reminder: sends three cards from public/cards.js (one per deck)
-// to a Telegram chat, answers hidden as spoilers. Run daily by
-// .github/workflows/telegram.yml.
+// Evening review reminder: a short greeting, then three cards from public/cards.js
+// (one per deck) as Telegram quiz polls. Run daily by .github/workflows/telegram.yml.
 //
-//   node scripts/telegram.js          send today's cards
-//   node scripts/telegram.js --dry    print the message instead of sending it
+//   node scripts/telegram.js          send today's quiz
+//   node scripts/telegram.js --dry    print what would be sent instead of sending it
 //   node scripts/telegram.js --chats  list chats that wrote to the bot, to find TELEGRAM_CHAT_ID
 //
 // Needs TELEGRAM_BOT_TOKEN (from @BotFather) and TELEGRAM_CHAT_ID.
@@ -23,7 +22,20 @@ async function loadCards() {
   return new Function(`${src}\nreturn { DECKS, CARDS };`)();
 }
 
-const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const plain = (html) => html.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+
+// Shown after a wrong answer, at most 200 characters: keep whole sentences.
+function explain(c) {
+  const text = plain(c.a);
+  if (text.length <= 200) return text;
+  let out = '';
+  for (const part of text.split(/(?<=[.;])\s+/)) {
+    const next = out ? `${out} ${part}` : part;
+    if (next.length > 200) break;
+    out = next;
+  }
+  return out || `${text.slice(0, 199)}…`;
+}
 
 // One card per deck; each deck walks through all its cards before repeating.
 function pickCards(cards, day) {
@@ -33,27 +45,27 @@ function pickCards(cards, day) {
   });
 }
 
-function buildMessage({ DECKS, CARDS }, now = new Date()) {
+function buildQuiz({ DECKS, CARDS }, now = new Date()) {
   const vn = new Date(now.getTime() + VN_OFFSET);
   const day = Math.floor(vn.getTime() / 864e5);
   const date = `${WEEKDAYS[vn.getUTCDay()]} ${vn.getUTCDate()}/${vn.getUTCMonth() + 1}`;
   const cards = pickCards(CARDS, day);
-  const deck = (c) => `${DOTS[c.tier - 1]} ${DECKS[c.tier - 1].title}`;
-  // Question in bold, answer (and tip) blurred inside a quote block.
-  const blocks = cards.map((c) => {
-    const answer = c.ex ? `${c.a}\n\n💡 ${c.ex}` : c.a;
-    return `${deck(c)} · <i>${esc(c.topic)}</i>\n<b>${esc(c.q)}</b>\n<blockquote><tg-spoiler>${answer}</tg-spoiler></blockquote>`;
+  const intro = `🧠 <b>Ôn AI · ${date}</b>\n<i>3 câu trắc nghiệm, khoảng 1 phút. Chọn đáp án, sai thì Telegram giải thích ngay.</i>`;
+  const polls = cards.map((c, i) => {
+    const buttons = [{ text: '📖 Xem thẻ đầy đủ', url: `${SITE}?the=${c.id}#hoc-ai` }];
+    if (i === cards.length - 1) buttons.push({ text: '📚 Ôn thêm trên trang', url: `${SITE}?the=all#hoc-ai` });
+    return {
+      question: `${DOTS[c.tier - 1]} ${DECKS[c.tier - 1].title} · ${c.q}`,
+      // The right answer is listed first; Telegram shuffles what the reader sees.
+      options: c.mc.map((text) => ({ text })),
+      type: 'quiz',
+      correct_option_ids: [0],
+      shuffle_options: true,
+      explanation: explain(c),
+      reply_markup: { inline_keyboard: [buttons] },
+    };
   });
-  const text = [
-    `🧠 <b>Ôn AI · ${date}</b>\n<i>3 câu, khoảng 2 phút. Tự trả lời trước, rồi chạm vào ô mờ để xem đáp án.</i>`,
-    ...blocks,
-    '<i>Chấm điểm trên trang để giữ chuỗi ngày học 👇</i>',
-  ].join('\n\n');
-  const keyboard = [
-    cards.map((c) => ({ text: deck(c), url: `${SITE}?the=${c.id}#hoc-ai` })),
-    [{ text: '📚 Mở bộ thẻ ôn tập', url: `${SITE}?the=all#hoc-ai` }],
-  ];
-  return { text, keyboard };
+  return { intro, polls };
 }
 
 async function api(method, body) {
@@ -70,10 +82,15 @@ async function api(method, body) {
 async function main() {
   const args = process.argv.slice(2);
   const deck = await loadCards();
-  const { text, keyboard } = buildMessage(deck);
+  const { intro, polls } = buildQuiz(deck);
   if (args.includes('--dry')) {
-    console.log(text);
-    console.log(keyboard.map((row) => row.map((b) => `[${b.text}]`).join(' ')).join('\n'));
+    console.log(intro);
+    for (const p of polls) {
+      console.log(`\n${p.question}`);
+      p.options.forEach((o, i) => console.log(`  ${i === 0 ? '✓' : '·'} ${o.text}`));
+      console.log(`  💡 ${p.explanation}`);
+      console.log(`  ${p.reply_markup.inline_keyboard[0].map((b) => `[${b.text}]`).join(' ')}`);
+    }
     return;
   }
   if (!TOKEN) {
@@ -95,14 +112,10 @@ async function main() {
     console.log('::warning::Chưa có TELEGRAM_CHAT_ID, bỏ qua lần nhắc này.');
     return;
   }
-  await api('sendMessage', {
-    chat_id: CHAT,
-    text,
-    parse_mode: 'HTML',
-    link_preview_options: { is_disabled: true },
-    reply_markup: { inline_keyboard: keyboard },
-  });
-  console.log('Đã gửi 3 thẻ ôn.');
+  await api('sendMessage', { chat_id: CHAT, text: intro, parse_mode: 'HTML' });
+  // Only the greeting rings; the quizzes arrive silently right under it.
+  for (const p of polls) await api('sendPoll', { chat_id: CHAT, disable_notification: true, ...p });
+  console.log('Đã gửi 3 câu trắc nghiệm.');
 }
 
 main().catch((err) => {

@@ -43,7 +43,7 @@ Repo, paper và mô hình/ứng dụng Hugging Face cũng được lọc cho dev
 ```
 server.js        máy chủ chạy trên máy: tính /data/<tên>.json trực tiếp
 scripts/build.js ghi public/data/*.json để đăng lên host tĩnh
-scripts/telegram.js gửi 3 thẻ ôn mỗi tối qua Telegram
+scripts/telegram.js gửi 3 câu trắc nghiệm mỗi tối qua Telegram
 lib/data.js      danh sách các bộ dữ liệu (news, repos, tech, ideas, models, tools, papers, progress)
 lib/news.js      danh sách nguồn, gom cụm tin, đếm xu hướng
 lib/feed.js      đọc RSS/Atom
@@ -76,7 +76,7 @@ Lịch 30 phút của GitHub có thể trễ vài phút. Nếu một nguồn d�
 
 ## Nhắc ôn qua Telegram
 
-Mỗi tối 20:00 (giờ Việt Nam) workflow "Nhắc ôn qua Telegram" (`.github/workflows/telegram.yml`) gửi 3 thẻ, mỗi cấp một thẻ, đáp án bị che (chạm để xem), kèm link mở đúng thẻ đó trên trang. Mỗi bộ đi hết 30 thẻ rồi mới lặp lại. Tiến độ ôn nằm trong trình duyệt nên tin nhắn không biết thẻ nào bạn đã thuộc.
+Mỗi tối 20:00 (giờ Việt Nam) workflow "Nhắc ôn qua Telegram" (`.github/workflows/telegram.yml`) gửi 3 câu trắc nghiệm (quiz của Telegram), mỗi cấp một câu: chọn đáp án là biết đúng sai, sai thì hiện giải thích; nút dưới mỗi câu mở đúng thẻ đó trên trang. Đáp án lấy từ trường `mc` trong `public/cards.js`. Mỗi bộ đi hết 30 thẻ rồi mới lặp lại. Tiến độ ôn nằm trong trình duyệt nên tin nhắn không biết thẻ nào bạn đã thuộc.
 
 1. Trên Telegram, nhắn [@BotFather](https://t.me/BotFather) lệnh `/newbot`, đặt tên, nhận **token** (dạng `123456:ABC…`). Giữ kín token này.
 2. Mở bot vừa tạo, bấm **Start**.

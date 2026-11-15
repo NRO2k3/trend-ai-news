@@ -22,7 +22,7 @@ jobs:
 
       # Bot token from @BotFather and your chat id (see README). Without them the
       # run only logs a warning.
-      - name: Gửi 3 thẻ ôn
+      - name: Gửi 3 câu trắc nghiệm
         run: node scripts/telegram.js
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
